@@ -3,12 +3,12 @@
 ## 0. 文档信息
 
 - 产品名称：tap-note
-- 文档版本：v5
+- 文档版本：v6
 - 文档状态：草稿
 - 创建日期：2026-07-17
 - 最后更新：2026-07-17
 - 输出路径：`docs/prd/main-prd.md`
-- 需求来源：用户初始构想（基于 BlockNote 开发支持 AI 助手的在线文档编辑器）+ 技术方案讨论结论（v2：AI 助手拆分为内联/对话两类 + 共享核心；v3：并发互斥、上下文体积策略、纯组件定位、demo 多路由；v4：导出提级 P1、体积阈值确认、client-side tools 不限危险操作；v5：导出包定义、集成方字体配置与字体脚本工具方向）
+- 需求来源：用户初始构想（基于 BlockNote 开发支持 AI 助手的在线文档编辑器）+ 技术方案讨论结论（v2：AI 助手拆分为内联/对话两类 + 共享核心；v3：并发互斥、上下文体积策略、纯组件定位、demo 多路由；v4：导出提级 P1、体积阈值确认、client-side tools 不限危险操作；v5：导出包定义、集成方字体配置与字体脚本工具方向；v6：正式 Sub 分组与 FEAT 唯一归属）
 
 ## 1. 产品背景
 
@@ -181,34 +181,56 @@ tap-note 要解决的问题：
 - **不包含**对 `@blocknote/xl-ai` / `@blocknote/xl-ai-server` 源码的 fork 或复制（授权规避）；ai-inline 仅参考其实现思路自行重写。
 - **不包含**协作编辑（Yjs 实时协同）——列入 P2 候选，MVP 不交付。
 - **不包含**文档持久化（存储/历史版本/草稿）——tap-note 定位为**纯组件产品**，不内置任何持久化能力，持久化由集成方自行实现；demo 应用刷新即丢内容属预期行为。
-- **不包含**导出为 ODT/Email 等 XL 格式——列入 P2 候选（PDF/DOCX/Markdown/HTML 已提级 P1，见 §14）。
+- **不包含**导出为 ODT/Email 等 XL 格式——列入 P2 候选（PDF/DOCX/Markdown/HTML 已提级 P1，见 §15）。
 - **不包含**用户账号体系与多租户——server-api 仅以 `bearerAuth(TOKEN)` 做网关级保护。
 - **不包含**移动端/小程序适配——仅面向现代桌面浏览器；本项目不涉及 Taro/小程序规范。
 - **不包含**对话助手的工具执行审批开关——前期工具直接执行；`needsApproval` 审批开关列入 P2 候选。
 - **不包含**内联与对话助手的并行同时执行——采用全局 AI 互斥（见 §4.6），任意 AI 进行中时另一助手不可触发。
 - **不包含**审批代理（agent-approval）与编辑器 AI 的集成——审批代理作为独立 agentic 示例保留，不进入内联/对话主流程。
 
-## 6. 功能模块地图
+## 6. 需求分支地图
 
-| 功能 ID | 功能名称 | 目录 | 说明 | 优先级 | 依赖 |
-|---|---|---|---|---|---|
-| FEAT-001 | 富文本编辑器 | `feat-rich-text-editor` | BlockNote shadcn 封装的可发布编辑器组件包 | P0 | - |
-| FEAT-002 | AI 共享核心 | `feat-ai-core` | BlockOperation schema/DocumentStateBuilder/applier/transport 工厂，供内联与对话复用 | P0 | - |
-| FEAT-003 | AI 内联助手 | `feat-ai-inline` | 编辑器内联 AI，参考 xl-ai 思路重写，逐块流式写入 + 接受/拒绝 | P0 | FEAT-001, FEAT-002, FEAT-005 |
-| FEAT-004 | AI 对话助手 | `feat-ai-chat` | 侧边对话面板，引用选区/文档上下文，离散 client-side tools 改文档 | P0 | FEAT-001, FEAT-002, FEAT-005 |
-| FEAT-005 | AI 后端服务 | `feat-ai-backend` | Hono + ai-sdk v7，editor streamText / chat / 模型列表 / 代理 / 审批示例 | P0 | - |
-| FEAT-006 | 参考应用 | `feat-reference-app` | 带 sidemenu 的多路由 web demo（内联/对话/并存），串联编辑器/助手/后端/模型切换 | P0 | FEAT-001~005 |
-| FEAT-007 | 开发者 SDK 与文档 | `feat-developer-sdk` | 发布包配置、集成指南、API 参考（含后端契约与导出集成） | P1 | FEAT-001~005, FEAT-008~010 |
-| FEAT-008 | 文档导出核心 | `feat-document-export-core` | 定义统一文档快照、导出结果、字体配置、资源解析与错误契约 | P1 | FEAT-001 |
-| FEAT-009 | PDF 导出 | `feat-document-export-pdf` | 基于自有导出 API 的 PDF 组件，支持中文字体由集成方注入 | P1 | FEAT-001, FEAT-008 |
-| FEAT-010 | DOCX 导出 | `feat-document-export-docx` | 基于自有导出 API 的 DOCX 组件，支持东亚字体配置与模板 | P1 | FEAT-001, FEAT-008 |
+| Sub ID | 分支名称 | 目录 | 说明 | 优先级 |
+|---|---|---|---|---|
+| SUB-001 | 字体集成工具 | `sub-font-tools` | 字体预设、安装、校验、配置生成和子集化工具；不负责文件格式转换 | P1 |
+| SUB-002 | 编辑器体验 | `sub-editor-experience` | BlockNote 编辑器组件与可路由 demo 体验 | P0 |
+| SUB-003 | AI 助手 | `sub-ai-assistant` | AI 共享核心、内联写作和侧边对话助手 | P0 |
+| SUB-004 | AI 服务平台 | `sub-ai-platform` | Hono AI 网关、模型路由、鉴权和流式 API | P0 |
+| SUB-005 | 文档导出 | `sub-document-export` | 文档快照、PDF/DOCX/Markdown/HTML 导出能力 | P1 |
+| SUB-006 | 开发者生态 | `sub-developer-ecosystem` | 包发布、集成指南、API 契约和开发者文档 | P1 |
 
-> v2 变更：原 FEAT-002「AI 写作助手」拆分为 FEAT-002（共享核心）、FEAT-003（内联）；新增 FEAT-004（对话）；原 FEAT-003/004/005 顺移为 FEAT-005/006/007。尚无 `feat-*` 目录、PRD 为草稿，重排影响仅限文档。
+### Sub 边界
 
-## 7. 功能模块说明
+- **SUB-001 字体集成工具**只生成和校验字体资源/配置，供 SUB-005 使用；不生成 PDF/DOCX。
+- **SUB-002 编辑器体验**拥有编辑器和 demo UI，不拥有 AI 协议、AI 后端或导出格式转换。
+- **SUB-003 AI 助手**拥有客户端 AI 交互与文档操作协议，调用 SUB-004 服务。
+- **SUB-004 AI 服务平台**拥有模型、认证和 API 运行时，不包含客户端编辑器 UI。
+- **SUB-005 文档导出**拥有格式转换和文件输出；字体由 SUB-001 提供，编辑器内容由 SUB-002 提供。
+- **SUB-006 开发者生态**只组织发布与文档，不拥有运行时业务能力。
+
+## 7. 功能模块地图
+
+| 功能 ID | 功能名称 | 所属 Sub | 目录 | 说明 | 优先级 | 依赖 |
+|---|---|---|---|---|---|---|
+| FEAT-001 | 富文本编辑器 | SUB-002 | `sub-editor-experience/feat-rich-text-editor` | BlockNote shadcn 封装的可发布编辑器组件包 | P0 | - |
+| FEAT-002 | AI 共享核心 | SUB-003 | `sub-ai-assistant/feat-ai-core` | BlockOperation、DocumentStateBuilder、applier 和 transport 工厂 | P0 | FEAT-001 |
+| FEAT-003 | AI 内联助手 | SUB-003 | `sub-ai-assistant/feat-ai-inline` | 编辑器内联 AI，逐块流式写入与接受/拒绝 | P0 | FEAT-001, FEAT-002, FEAT-005 |
+| FEAT-004 | AI 对话助手 | SUB-003 | `sub-ai-assistant/feat-ai-chat` | 侧边对话、上下文引用和离散 client-side tools | P0 | FEAT-001, FEAT-002, FEAT-005 |
+| FEAT-005 | AI 后端服务 | SUB-004 | `sub-ai-platform/feat-ai-backend` | Hono + ai-sdk，editor/chat/模型 API | P0 | - |
+| FEAT-006 | 参考应用 | SUB-002 | `sub-editor-experience/feat-reference-app` | 带 sidemenu 的多路由 demo（内联/对话/并存） | P0 | FEAT-001~005 |
+| FEAT-007 | 开发者 SDK 与文档 | SUB-006 | `sub-developer-ecosystem/feat-developer-sdk` | 发布包配置、集成指南、API 契约与导出集成 | P1 | FEAT-001~006, FEAT-008~011 |
+| FEAT-008 | 文档导出核心 | SUB-005 | `sub-document-export/feat-document-export-core` | 文档快照、导出结果、字体配置、资源解析和错误契约 | P1 | FEAT-001 |
+| FEAT-009 | PDF 导出 | SUB-005 | `sub-document-export/feat-document-export-pdf` | 自有 PDF exporter，中文字体由集成方注入 | P1 | FEAT-001, FEAT-008, FEAT-011 |
+| FEAT-010 | DOCX 导出 | SUB-005 | `sub-document-export/feat-document-export-docx` | 自有 DOCX exporter，东亚字体配置与模板 | P1 | FEAT-001, FEAT-008, FEAT-011 |
+| FEAT-011 | 字体集成工具 | SUB-001 | `sub-font-tools/feat-font-integration-tools` | 字体预设、固定版本下载、校验、配置生成与子集化脚本 | P1 | FEAT-008 |
+
+> v6 分组说明：新增 6 个正式 Sub 和 FEAT-011。原 FEAT-001~010 的 ID 和功能名称保持不变，仅补充唯一所属 Sub 与嵌套目录路径；字体工具已由用户确认作为独立分支，因此新增 FEAT-011。`feat-*` 目录尚未创建，后续由 `/oc-prd-feat` 负责。
+
+## 8. 功能模块说明
 
 ### FEAT-001：富文本编辑器
 
+- 所属 Sub：SUB-002 编辑器体验
 - 功能目标：将 `@blocknote/core` + `@blocknote/react` + `@blocknote/shadcn`（均 MPL-2.0）封装为开箱即用的 `@tap-note/editor` 包，提供 `TapNoteEditor` 组件与 `useCreateTapNoteEditor` hook，统一处理初始内容、主题、slash 菜单、格式工具栏默认装配。
 - 核心场景：集成开发者 `<TapNoteEditor initialContent={...} />` 即可获得 Notion 风格编辑体验；终端创作者在参考应用中直接使用。
 - 输入与输出：输入 `initialContent`（BlockNote blocks JSON）、可选 `inlineAssistant`（来自 FEAT-003）、可选 `chatAssistant`（来自 FEAT-004，用于侧边面板挂载）、可选 `editable`、`theme`；输出受控/非受控编辑器实例与文档变更回调。
@@ -217,6 +239,7 @@ tap-note 要解决的问题：
 
 ### FEAT-002：AI 共享核心
 
+- 所属 Sub：SUB-003 AI 助手
 - 功能目标：提供 `@tap-note/ai-core` 包，集中两类助手共享的协议、schema、执行器与 transport 工厂，避免内联与对话包重复实现，保证两者写入文档的语义一致。
 - 核心场景：FEAT-003 内联助手与 FEAT-004 对话助手都通过 ai-core 序列化文档状态、定义 BlockOperation、并把操作应用到编辑器；集成开发者也可直接用 ai-core 自定义助手。
 - 输入与输出：
@@ -233,6 +256,7 @@ tap-note 要解决的问题：
 
 ### FEAT-003：AI 内联助手
 
+- 所属 Sub：SUB-003 AI 助手
 - 功能目标：提供 `@tap-note/ai-inline` 包，参考 `@blocknote/xl-ai` 的实现思路**自行重写**（不引入其源码，规避 GPL），实现编辑器内联 Notion 式逐块流式写入 + 接受/拒绝工作流。
 - 核心场景：创作者 `/ai` 唤起 AIMenu 输入指令，或选中文本点 AI 按钮；AI 流式将 BlockOperation（来自 FEAT-002）应用到文档（可回退）；用户接受/拒绝/中止/重试。
 - 输入与输出：输入 `transport`（来自 ai-core）、可选 `streamToolsProvider`、`documentStateBuilder`、`model`；输出 BlockNote `AIExtension` 等价扩展 `TapNoteAIInlineExtension`、`AIMenuController`、`AIToolbarButton`、`getAISlashMenuItems`、zh-CN 字典。
@@ -245,6 +269,7 @@ tap-note 要解决的问题：
 
 ### FEAT-004：AI 对话助手
 
+- 所属 Sub：SUB-003 AI 助手
 - 功能目标：提供 `@tap-note/ai-chat` 包，实现 Cursor/Copilot Chat 式侧边对话面板，支持引用当前选区/文档作为上下文，通过 AI SDK v7 client-side tools 以离散工具调用修改编辑器文档。
 - 核心场景：创作者打开侧边 `TapNoteChatPanel`，选择「引用选区」或「引用全文」或不引用，输入消息；AI 在多轮对话中每次返回单个 BlockOperation 工具调用，客户端执行后作用于编辑器，聊天气泡展示操作结果。
 - 输入与输出：
@@ -261,6 +286,7 @@ tap-note 要解决的问题：
 
 ### FEAT-008：文档导出核心
 
+- 所属 Sub：SUB-005 文档导出
 - 功能目标：提供 `@tap-note/export-core`，定义 PDF、DOCX、Markdown、HTML 共用的导出输入、输出、字体、资源和错误契约；不依赖具体编辑器 UI，也不强制依赖任何格式 exporter。
 - 核心场景：集成方将 BlockNote 文档快照传入导出包，在浏览器得到 `Blob`/`Uint8Array`，或在服务端转换为 HTTP Response；导出包不要求集成方使用 `apps/server-api`。
 - 输入与输出：
@@ -272,6 +298,7 @@ tap-note 要解决的问题：
 
 ### FEAT-009：PDF 导出
 
+- 所属 Sub：SUB-005 文档导出
 - 功能目标：提供 `@tap-note/export-pdf`，参考 BlockNote `xl-pdf-exporter` 的 schema mapping、字体注册、图片/emoji 和页面渲染思路，自行实现授权干净的 PDF 导出能力。
 - 核心场景：集成方配置 CJK 字体后，在浏览器或 Node.js 中将文档导出为稳定可打开的 PDF；没有 CJK 字体时必须给出明确 warning/error，不得静默生成乱码。
 - 输入与输出：输入 FEAT-008 的统一文档快照、PDF 页面配置、字体配置、图片/emoji 资源解析器、header/footer；输出 PDF Blob/Uint8Array。
@@ -281,6 +308,7 @@ tap-note 要解决的问题：
 
 ### FEAT-010：DOCX 导出
 
+- 所属 Sub：SUB-005 文档导出
 - 功能目标：提供 `@tap-note/export-docx`，参考 BlockNote `xl-docx-exporter` 的 OOXML 模板、schema mapping、图片和多列处理思路，自行实现授权干净的 DOCX 导出能力。
 - 核心场景：集成方在浏览器或 Node.js 中生成可被 Microsoft Word、LibreOffice 等工具打开的 DOCX；通过配置 `ascii`、`eastAsia`、`hAnsi`、`cs` 字体名称控制中文字体映射。
 - 输入与输出：输入 FEAT-008 的统一文档快照、DOCX 字体配置、可选模板、图片资源解析器和文档元数据；输出 DOCX Blob/Uint8Array。
@@ -288,8 +316,18 @@ tap-note 要解决的问题：
 - 字体策略：默认不在 DOCX 中嵌入字体，由集成方保证目标环境存在指定字体；支持集成方提供模板或自定义东亚字体名称；字体配置缺失时给出 warning。
 - 工程边界：包名 `@tap-note/export-docx`，目录 `packages/tap-note-export-docx`；不得导入 `@blocknote/xl-docx-exporter` 或 `@blocknote/xl-multi-column`。
 
+### FEAT-011：字体集成工具
+
+- 所属 Sub：SUB-001 字体集成工具
+- 功能目标：提供可选 `@tap-note/font-tools`，帮助集成方安装、校验、配置和优化 CJK 字体，降低 PDF/DOCX 中文导出的接入成本；不在基础包中捆绑完整中文字体。
+- 核心场景：集成方执行 CLI 安装固定版本字体预设，工具校验 SHA-256、许可证、基础中文覆盖和变体，并生成 `@tap-note/export-pdf`/`@tap-note/export-docx` 可消费的配置。
+- 输入与输出：输入字体预设或集成方自有字体、目标目录、字符集和可选字体镜像；输出字体资源、LICENSE/NOTICE、PDF 注册配置、DOCX `eastAsia` 配置、检查报告和可选子集字体。
+- 依赖：FEAT-008 的 `FontConfig`/`FontSource` 契约；可选使用 fontTools 作为构建期子集化 adapter；不得作为编辑器、AI 或导出核心的强制运行时依赖。
+- 工程边界：包名暂定 `@tap-note/font-tools`，目录 `packages/tap-note-font-tools`；只参考字体工具和 BlockNote exporter 的设计，不复制 GPL 源码；字体许可证由集成方负责。
+
 ### FEAT-005：AI 后端服务
 
+- 所属 Sub：SUB-004 AI 服务平台
 - 功能目标：基于 Hono + ai-sdk v7 的可自托管 AI 网关 `apps/server-api`，提供内联写作 streamText、对话 chat、模型列表、可选透明代理，并保留现有审批代理作为独立示例。
 - 核心场景：内联助手 `DefaultChatTransport` 请求 `/api/ai/editor/streamText`；对话助手 `useChat` 请求 `/api/ai/chat`；前端启动时拉 `/api/ai/models` 渲染模型下拉。
 - 输入与输出：
@@ -303,6 +341,7 @@ tap-note 要解决的问题：
 
 ### FEAT-006：参考应用
 
+- 所属 Sub：SUB-002 编辑器体验
 - 功能目标：端到端可运行 web demo `apps/web`，作为带侧边菜单（sidemenu）的多路由演示站，分别展示内联助手、对话助手、并存等场景，串联编辑器、助手、后端与模型切换，作为产品演示与二次开发起点。
 - 核心场景：`bun dev` 启动 web + server-api；通过 sidemenu 在不同路由间切换：
   - `/inline`：仅内联助手 demo（`/ai` 写作 + 接受/拒绝）
@@ -315,13 +354,14 @@ tap-note 要解决的问题：
 
 ### FEAT-007：开发者 SDK 与文档
 
+- 所属 Sub：SUB-006 开发者生态
 - 功能目标：让集成开发者能在自有应用中使用 tap-note，提供发布配置、集成指南、API 参考。
 - 核心场景：开发者阅读文档 → `npm install @tap-note/editor @tap-note/ai-core @tap-note/ai-inline @tap-note/ai-chat` → 配置 transport → 渲染编辑器与助手。
 - 输入与输出：发布包的 `package.json` exports、README、API 参考。
-- 依赖：FEAT-001~005、FEAT-008~010。
+- 依赖：FEAT-001~006、FEAT-008~011。
 - 工程边界：P1 交付；tsup/vite 构建配置、`exports` 字段、类型声明、集成示例。
 
-## 8. 用户故事
+## 9. 用户故事
 
 - **US-001**（集成开发者）：我希望 `npm install @tap-note/editor` 后，用 3 行代码在 React 应用中渲染一个可编辑文档，且不必担心 GPL 传染。
 - **US-002**（集成开发者）：我希望通过 `createTapNoteInlineAssistant({ transport: createServerTransport({ baseUrl }) })` 一行接入内联 AI，AI 写入是逐块流式的，用户可接受/拒绝。
@@ -335,10 +375,12 @@ tap-note 要解决的问题：
 - **US-010**（终端创作者）：我在对话面板选「引用全文」输入「帮我加一个总结小标题」，AI 调用工具在文档开头插入一个标题块，文档实时更新。
 - **US-011**（终端创作者）：我和对话助手多轮交流，先让它「列三个要点」，再让它「把第二点展开成段落」，它能基于上下文连续操作编辑器。
 - **US-012**（集成开发者）：我希望对话助手与内联助手能并存于同一编辑器，各自独立工作，互不干扰。
+- **US-013**（集成开发者）：我希望通过字体工具一键安装固定版本的中文字体并生成导出配置，而不是手工处理字体、许可证和 PDF/DOCX 字体映射。
 
-## 9. 全局业务规则
+## 10. 全局业务规则
 
 - **授权规则**：`packages/tap-note-editor`、`packages/tap-note-ai-core`、`packages/tap-note-ai-inline`、`packages/tap-note-ai-chat`、`packages/tap-note-export-core`、`packages/tap-note-export-pdf`、`packages/tap-note-export-docx` 的 `dependencies` 不得包含任何 GPL-3.0/AGPL/专有授权的 BlockNote 包（包括 `@blocknote/xl-ai`、`@blocknote/xl-ai-server`、`@blocknote/xl-pdf-exporter`、`@blocknote/xl-docx-exporter`、`@blocknote/xl-multi-column`）；仅允许 MPL-2.0（`@blocknote/core`/`react`/`shadcn`）与宽松授权第三方包。ai-inline 与 exporter 仅阅读 `resource/BlockNote` submodule 作思路参考，不复制源码。`apps/server-api` 作为不分发的私有 app 可按需引用任意授权的运行时依赖，但不得将未经授权的 XL exporter 作为对外发布包的隐式依赖。
+- **授权规则**：`packages/tap-note-editor`、`packages/tap-note-ai-core`、`packages/tap-note-ai-inline`、`packages/tap-note-ai-chat`、`packages/tap-note-export-core`、`packages/tap-note-export-pdf`、`packages/tap-note-export-docx`、`packages/tap-note-font-tools` 的 `dependencies` 不得包含任何 GPL-3.0/AGPL/专有授权的 BlockNote 包（包括 `@blocknote/xl-ai`、`@blocknote/xl-ai-server`、`@blocknote/xl-pdf-exporter`、`@blocknote/xl-docx-exporter`、`@blocknote/xl-multi-column`）；仅允许 MPL-2.0（`@blocknote/core`/`react`/`shadcn`）与宽松授权第三方包。ai-inline、exporter 和字体工具仅阅读 `resource/BlockNote` submodule 作思路参考，不复制源码。`apps/server-api` 作为不分发的私有 app 可按需引用任意授权的运行时依赖，但不得将未经授权的 XL exporter 作为对外发布包的隐式依赖。
 - **API 契约规则**：所有业务路由以 `/api/` 前缀开头；非流式响应统一 `{ code: string, message: string, data: unknown }`，成功 `code="SUCCESS"`；流式 AI 端点（`/api/ai/editor/streamText`、`/api/ai/chat`）直接返回 UIMessageStream（AI SDK 协议），不套业务信封。
 - **模型规则**：模型 ID 形如 `<provider>:<model>`（如 `dashscope:qwen-plus`）；服务端仅返回环境变量已配置的 provider 对应模型；前端不得持有任何 LLM API Key。
 - **工具执行规则**：内联助手（FEAT-003）的 BlockOperation 流式应用在客户端完成；对话助手（FEAT-004）的 client-side tools 在浏览器内 execute，server 仅声明工具不执行。前期两类助手工具均直接执行，不设审批开关；`needsApproval` 列入 P2 候选。
@@ -352,7 +394,7 @@ tap-note 要解决的问题：
 - **版本规则**：所有依赖使用最新稳定版；TypeScript 保持 `~6`（最新 6.x），不升级到 7.x（等生态适配）。
 - **规范适用规则**：本项目为 Hono + Vite + React 的纯 Web 项目，仅遵循 hono 与 JS/TS 通用编码规范；**不涉及 Taro/小程序规范**，相关规则对本项目不生效。
 
-## 10. 全局非功能需求
+## 11. 全局非功能需求
 
 | 类别 | 要求 |
 |---|---|
@@ -365,7 +407,7 @@ tap-note 要解决的问题：
 | 国际化 | 默认 zh-CN，字典可扩展 |
 | 可靠性 | AI 调用失败可重试、可中止、可回退到写作前状态；suggest-changes 保证文档一致性 |
 
-## 11. 外部系统与数据依赖
+## 12. 外部系统与数据依赖
 
 | 依赖 | 角色 | 授权 | 备注 |
 |---|---|---|---|
@@ -385,7 +427,7 @@ tap-note 要解决的问题：
 | React 19 / Tailwind 4 / shadcn | 前端基础 | MIT/Apache | 已就绪 |
 | Bun + Turbo | 构建与编排 | MIT | 已就绪 |
 
-## 12. 类似产品与开源方案调研
+## 13. 类似产品与开源方案调研
 
 | 方案 | 来源 | 可借鉴点 | 限制或排除原因 |
 |---|---|---|---|
@@ -400,7 +442,7 @@ tap-note 要解决的问题：
 
 > 调研日期：2026-07-17（v2 追加 Cursor Chat / Copilot Chat 与 client-side tools；v5 追加 BlockNote PDF/DOCX exporter 与 React PDF 字体机制调研）。调研方式：Context7 文档查询 + npm registry 版本核查 + BlockNote submodule 源码阅读。未能联网验证的部分已标注为「AI 推断」。
 
-## 13. 关键决策记录
+## 14. 关键决策记录
 
 | 决策 | 备选方案 | 选择理由 | 影响 |
 |---|---|---|---|
@@ -430,8 +472,9 @@ tap-note 要解决的问题：
 | **[v5]** 导出能力拆分为 export-core/PDF/DOCX 三个可选包 | (A) 只放 server-api (B) 单一 export 包 (C) core + format packages | 用户要求补充包开发定义；可独立发布、按需安装并隔离格式依赖 | 新增 FEAT-008~010；发布包自研，不依赖 GPL XL exporter；server-api 仅提供可选适配 |
 | **[v5]** 字体由集成方配置，基础包不捆绑 CJK 字体 | (A) 基础包内置完整字体 (B) 集成方配置 (C) 仅依赖系统字体 | 用户选 B；避免仓库和包体积膨胀，同时支持企业字体 | export-core 提供字体配置契约；后续提供字体检查/下载/裁剪/转换/注册脚本 |
 | **[v5]** PDF/DOCX 参考 XL exporter 思路但不复制源码 | (A) 直接依赖 XL exporter (B) 自研兼容实现 | 用户要求参考源码实现；发布包需保持授权干净 | 需自研 schema mapping、字体、图片、表格和未支持 block 策略 |
+| **[v6]** 按 6 个 Sub 重组产品需求 | (A) 单层 FEAT (B) 5 个 Sub（字体并入导出）(C) 6 个 Sub（字体独立） | 用户选 C；字体资源、许可证与安装工具具有独立边界，且已创建独立 sub 文档 | 新增 SUB-001~006；所有 FEAT 归属唯一 Sub；新增 FEAT-011 字体集成工具 |
 
-## 14. 版本规划
+## 15. 版本规划
 
 ### MVP
 
@@ -446,12 +489,12 @@ tap-note 要解决的问题：
 
 ### P1
 
-- FEAT-007：`@tap-note/editor`、`ai-core`、`ai-inline`、`ai-chat` 的 npm 发布配置（exports、类型声明、tsup/vite 构建）、集成指南、API 参考文档。
+- FEAT-007：`@tap-note/editor`、`ai-core`、`ai-inline`、`ai-chat`、`export-*`、`font-tools` 的 npm 发布配置（exports、类型声明、tsup/vite 构建）、集成指南、API 参考文档。
 - `/api/ai/proxy` 透明代理 + `createProxyTransport`（ClientSideTransport 等价能力，供内联可选）。
 - 更多 BlockNote 块类型适配（表格、代码块等在 BlockOperation schema 中的覆盖验证）。
 - 主题与样式作用域隔离方案落地（`@blocknote/shadcn` vs `@workspace/ui`）。
 - 对话助手工具调用结果展示增强（diff 预览、跳转到被修改块）。
-- **FEAT-008~010 文档导出**（从 P2 提级）：发布 `@tap-note/export-core`、`@tap-note/export-pdf`、`@tap-note/export-docx`，并提供 Markdown/HTML 转换适配。导出核心不依赖 `apps/server-api`；浏览器返回 Blob，Node.js/Hono 提供 Uint8Array/Response 适配。
+- **FEAT-008~011 文档导出与字体集成**（从 P2 提级）：发布 `@tap-note/export-core`、`@tap-note/export-pdf`、`@tap-note/export-docx`、`@tap-note/font-tools`，并提供 Markdown/HTML 转换适配。导出核心不依赖 `apps/server-api`；浏览器返回 Blob，Node.js/Hono 提供 Uint8Array/Response 适配。
 - PDF/DOCX 参考 BlockNote `xl-pdf-exporter`/`xl-docx-exporter` 的转换思路，但发布包不得直接依赖 GPL XL exporter。PDF 中文字体由集成方提供，DOCX 通过 `eastAsia` 字体配置或模板指定；后续提供字体检查、下载、裁剪、转换和注册脚本工具。
 
 ### P2（候选）
@@ -460,7 +503,7 @@ tap-note 要解决的问题：
 - 对话助手 `needsApproval` 工具执行审批开关；agent-approval 与编辑器 AI 的场景化集成。
 - 用户账号体系与多租户。
 
-## 15. 全局验收标准
+## 16. 全局验收标准
 
 1. **编辑器可用性**：`<TapNoteEditor initialContent={...} />` 在 React 19 应用中渲染，支持回车建块、`/` slash 菜单、拖拽重排、缩进嵌套、格式工具栏，操作流畅无报错。
 2. **内联 AI 流式写作**：`/ai 续写一段...` 后，AI 内容逐块流式写入文档，可见实时变化；写作中可点「中止」立即停止并回退。
@@ -474,7 +517,7 @@ tap-note 要解决的问题：
 10. **模型切换**：下拉切换模型后，下一次 AI 调用（内联或对话）服务端日志显示使用新模型，前端无 Key 暴露。
 11. **模型列表**：仅配置了 DashScope 未配 Gemini 时，`/api/ai/models` 只返回 dashscope 模型；配齐后两者都返回。
 12. **Key 安全**：浏览器 DevTools Network 面板中，所有请求均不含 LLM API Key；服务端注入 Key 后再转发。
-13. **授权合规**：`packages/tap-note-{editor,ai-core,ai-inline,ai-chat}/package.json` 的 `dependencies` 中无 `@blocknote/xl-ai` 或任何 GPL/专有包，`npm ls` 验证。
+13. **授权合规**：`packages/tap-note-{editor,ai-core,ai-inline,ai-chat,export-core,export-pdf,export-docx,font-tools}/package.json` 的 `dependencies` 中无 `@blocknote/xl-*` 或任何 GPL/专有包，`npm ls` 验证。
 14. **可观测性**：任意一次 AI 调用（内联 `/api/ai/editor/streamText` 或对话 `/api/ai/chat`）在 server-api 日志中可用同一 requestId 串联请求全链路。
 15. **demo 多路由**：sidemenu 可在 `/inline`、`/chat`、`/both` 三路由切换，各路由独立可用；`/both` 路由验证内联与对话互斥。
 16. **纯组件无持久化**：demo 刷新后内容丢失属预期；`@tap-note/*` 包不导出任何存储 API。
@@ -485,7 +528,7 @@ tap-note 要解决的问题：
 21. **字体集成工具**：字体脚本能够检查字体格式和基本中文字符覆盖，并生成可被导出包注册的资源或配置示例；字体许可证和资源由集成方负责。
 22. **类型与代码规范**：`bun run typecheck` 与 `bun run lint` 全绿。
 
-## 16. 假设与待确认事项
+## 17. 假设与待确认事项
 
 1. **【假设】** tap-note 同时面向「集成开发者（SDK）」与「终端创作者（参考应用）」两类用户。需求来源未明确区分，此处基于「发布独立包」+「demo 应用」的双重诉求推断。**待用户确认**是否以终端创作者（SaaS 产品）为唯一目标，或确认双角色定位。
 2. **【已决策】** tap-note 为纯组件产品，不内置任何持久化能力（用户确认）；持久化由集成方实现；demo 刷新丢内容属预期。原 P2「文档持久化」已移除。
@@ -504,8 +547,10 @@ tap-note 要解决的问题：
 15. **【已决策】** PDF/DOCX 导出属于 P1，并拆分为 `@tap-note/export-core`、`@tap-note/export-pdf`、`@tap-note/export-docx`；Markdown/HTML 作为 export-core 或对应适配能力提供。
 16. **【已决策】** 字体由集成方配置，基础导出包不捆绑完整 CJK 字体；后续提供字体检查、下载、裁剪、转换和注册脚本工具，字体许可证由集成方负责。
 17. **【已决策】** PDF/DOCX 仅参考 `xl-pdf-exporter`、`xl-docx-exporter` 源码设计，不复制源码或引入 `xl-*` exporter 依赖。
+18. **【已决策】** 产品按 6 个 Sub 划分：字体集成工具、编辑器体验、AI 助手、AI 服务平台、文档导出、开发者生态；所有 FEAT 必须唯一归属其中之一。
+19. **【已决策】** 字体集成工具登记为 FEAT-011，归属 SUB-001；`docs/prd/sub-font-tools/` 已有 Sub 文档，其他 Sub 的目录与文档后续由 `/oc-prd-sub` 生成。
 
-## 17. 变更记录
+## 18. 变更记录
 
 | 版本 | 日期 | 变更内容 |
 |---|---|---|
@@ -514,3 +559,4 @@ tap-note 要解决的问题：
 | v3 | 2026-07-17 | 应用审查反馈与用户新决策：① 全局 AI 互斥（共享 busy 状态，任一进行中时另一助手入口禁用，新增 §4.6、§9 并发规则、ai-core `createAIBusyState`）；② 上下文体积分层策略（选区软上限 4K 提示减少、全文永不直发按 8K 预算截断/2× 预算改发大纲，新增 §4.4、§9 体积规则、FEAT-002/004 补充）；③ 纯组件定位，不内置持久化（§4.1/§5.2/§14 P2/§16 同步，移除 P2 文档持久化）；④ demo 改为带 sidemenu 多路由（`/inline`、`/chat`、`/both`，FEAT-006 重定义）；⑤ 订正：§10 Biome→ESLint、删 taro（本项目不涉 Taro/小程序，新增 §9 规范适用规则）、§9 packages/ 前缀统一、§5.1 ChatGPT 式→Cursor/Copilot Chat 式、§13 首行包名加注、§6 FEAT-007 依赖补 FEAT-005、§7 FEAT-003 依赖写法订正、§7 FEAT-004 补 getDocumentSnapshot 用途。新增 §15 验收 8/9/15/16，验收标准 14→17，待确认 11→14（新增体积阈值、client-side tools 安全边界）。 |
 | v4 | 2026-07-17 | 三项用户确认：① 导出 PDF/DOCX/Markdown/HTML 由 P2 提级到 P1（§14 P1 增列、P2 移除；附 BlockNote XL exporter GPL 处理说明：导出走 server-api 私有 app 或自研，MD/HTML 用 core 内置转换）；② 上下文体积阈值采用推荐默认（4K/8K/2×，§16 item 13 待确认→已决策，仍留 token 估算算法待定）；③ client-side tools 前期不限制 deleteAll 类危险操作（§16 item 14 待确认→已决策，接受 prompt injection 风险）。§13 新增三项 v4 决策。 |
 | v5 | 2026-07-17 | 根据导出专项审查补充：新增 FEAT-008「文档导出核心」、FEAT-009「PDF 导出」、FEAT-010「DOCX 导出」及 `@tap-note/export-core`、`@tap-note/export-pdf`、`@tap-note/export-docx` 包定义；补充导出流程、字体配置流程、统一输入输出与错误契约、PDF/DOCX 功能边界、授权隔离、外部 exporter 调研和 6 项导出验收标准。明确字体由集成方配置，基础包不捆绑 CJK 字体，后续提供字体检查/下载/裁剪/转换/注册脚本；明确只参考 BlockNote XL exporter 思路，不复制源码或依赖。FEAT-007 依赖同步包含导出模块。 |
+| v6 | 2026-07-17 | 按用户确认的 6 个需求分支重组总 PRD：新增 §6 需求分支地图（SUB-001 字体集成工具、SUB-002 编辑器体验、SUB-003 AI 助手、SUB-004 AI 服务平台、SUB-005 文档导出、SUB-006 开发者生态），原功能模块地图调整为 §7 并增加唯一所属 Sub 与嵌套 `sub-*/feat-*` 目录路径；原功能模块说明调整为 §8 并为全部 FEAT 补 Sub 归属。新增 FEAT-011「字体集成工具」归属 SUB-001；更新 P1、用户故事、授权规则、验收标准和待确认事项。后续由 `/oc-prd-sub` 为尚未建文档的 Sub 生成分支文档，由 `/oc-prd-feat` 创建 feat 文档。 |
