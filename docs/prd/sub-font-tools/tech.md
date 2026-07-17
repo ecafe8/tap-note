@@ -6,7 +6,7 @@
 - 所属产品：tap-note
 - 总 PRD：`docs/prd/main-prd.md`
 - Sub PRD：`docs/prd/sub-font-tools/prd.md`
-- 文档版本：v1
+- 文档版本：v2
 - 文档状态：草稿
 - 技术结论：字体由集成方配置，tap-note 提供可选字体预设和安装/检查/配置生成工具
 
@@ -59,6 +59,17 @@ tap-note-font-tools
 ```
 
 字体工具不应被 `tap-note-editor` 依赖。导出包也不应在安装时自动下载字体。
+
+```mermaid
+flowchart TD
+  R[Preset registry] --> D[Downloader]
+  D --> I[Font inspector]
+  I --> G[Config generator]
+  I --> S[Optional subsetter adapter]
+  G --> P[export-pdf]
+  G --> X[export-docx]
+  S --> P
+```
 
 ## 4. 分层架构
 
@@ -263,3 +274,9 @@ type MissingGlyphPolicy = "warn" | "error"
 - 是否引入 `fontkit` 作为 Node glyph 检查依赖；当前不锁定。
 - 开源字体预设的许可证、Reserved Font Name 和再分发条件需要逐字体复核。
 - 远程字体 URL 的 CORS、SRI 和离线 fallback 策略需要在导出包技术方案中统一。
+
+## 12. 增量同步记录
+
+- 【总 PRD 要求】v7 已将本分支登记为 SUB-001/FEAT-011，目录为 `sub-font-tools/feat-font-integration-tools`；本技术方案不创建该 feat 目录。
+- 【代码库事实】字体工具和导出包仍不存在。
+- 【外部资料结论】本次未重新查询 `@react-pdf/renderer`、`docx` 或 fontTools 的 Context7 文档：本轮 Context7 配额用于当前主运行时库。既有版本/API 记录仅作历史调研，实施前必须再次确认。
