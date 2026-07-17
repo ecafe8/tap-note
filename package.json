@@ -9,7 +9,7 @@
     "format": "turbo format",
     "typecheck": "turbo typecheck",
     "submodule:init": "git submodule update --init --recursive --progress",
-    "docs": "mdts ./docs"
+    "docs": "mdts ./docs -p 8881"
   },
   "devDependencies": {
     "mdts": "^0.20.3",
