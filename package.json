@@ -8,8 +8,8 @@
     "lint": "turbo lint",
     "format": "turbo format",
     "typecheck": "turbo typecheck",
-    "sync:resource": "git submodule update --remote resource/BlockNote",
-    "docs": "mdts docs"
+    "submodule:init": "git submodule update --init --recursive --progress",
+    "docs": "mdts ./docs"
   },
   "devDependencies": {
     "mdts": "^0.20.3",
