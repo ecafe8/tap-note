@@ -5,7 +5,7 @@
 - 功能 ID：FEAT-001
 - 所属 Sub：SUB-002 编辑器体验
 - 所属产品：tap-note
-- 总 PRD：`docs/prd/main-prd.md`（v7）
+- 总 PRD：`docs/prd/main-prd.md`（v8）
 - Sub PRD：`docs/prd/sub-editor-experience/prd.md`
 - 功能目录：`docs/prd/sub-editor-experience/feat-rich-text-editor/`
 - 文档版本：v1

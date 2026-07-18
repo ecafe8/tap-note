@@ -2,7 +2,7 @@
 
 ## 0. 文档信息
 
-- 功能 ID：FEAT-001；所属 Sub：SUB-002；状态：草稿；依据：总 PRD v7、SUB-002 `tech.md`。
+- 功能 ID：FEAT-001；所属 Sub：SUB-002；状态：草稿；依据：总 PRD v8、SUB-002 `tech.md`。
 
 ## 1. 当前项目事实与复用点
 
@@ -121,10 +121,15 @@ interface TapNoteEditorProps {
 - 备选 A：直接暴露 BlockNote UI（不封装）。优点：工作量小；缺点：无法稳定 tap-note 公开 API，集成方升级易碎。排除。
 - 备选 B：包装一层 `TapNoteEditor`（采纳）。维护成本略增，但满足产品目标（稳定 API、授权干净、可发布）。
 - 构建工具：tsup vs vite 库模式——待 P1 FEAT-007 统一决策，MVP 不阻塞。
+- shadcn 组件复用策略（总 PRD v8 §9、§17 item 23）：三段优先级——① 优先复用 `@workspace/ui` 已有 shadcn 官方组件；② API 不兼容时降级为 `@blocknote/shadcn` 自带组件；③ 需深度定制或规避版权时参考 `resource/BlockNote` 源码自定义组件。具体落到哪一段由 T-001 实测确认（`@workspace/ui` 基于 base-ui，非 radix，`shadCNComponents` 兼容性为风险点）。
+- 测试框架（总 PRD v8 §17 item 24）：采用 `bun:test`，与 Bun 工具链统一，不引入 Vitest；React 组件测试需配合 `happy-dom` + `@testing-library/react`（版本由 FEAT-001 T-010 锁定）。
+- 参考代码（总 PRD v8 §9、§17 item 22）：`resource/BlockNote` submodule 为首要参考来源，实现优先阅读源码再独立编写，不复制受保护表达。
 
 ## 13. 技术风险与待确认
 
-- shadcn 样式与 `@workspace/ui`（base-ui + tailwind-merge@3）的样式作用域冲突尚未实测（总 PRD §17 item 3）。
+- shadcn 样式与 `@workspace/ui`（base-ui + tailwind-merge@3）的样式作用域冲突尚未实测（总 PRD §17 item 3）。已有三段降级策略（§12），具体落到哪一段由 T-001 实测。
+- `@workspace/ui` base-ui 组件 API 是否满足 `BlockNoteView.shadCNComponents` 期望——核心兼容风险，T-001 实测确认。
 - BlockNote 精确 API 与依赖版本须实施前以官方文档 + lockfile 确认。
 - npm scope `@tap-note/*` 待用户确认（总 PRD §17 item 8）。
 - `@blocknote/shadcn` 自带 radix + tailwind-merge@2 与 `@workspace/ui` tailwind-merge@3 共存方案待实测。
+- `happy-dom`/`@testing-library/react` 与 React 19 + `bun:test` 的具体版本须 T-010 锁定。
