@@ -1,3 +1,4 @@
+import '@blocknote/shadcn/style.css'
 import { BlockNoteView } from '@blocknote/shadcn'
 import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import {

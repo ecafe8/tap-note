@@ -288,3 +288,23 @@ MVP 阶段仅修 `@source` 路径(指向 Bun 1.3 真实 hoisting 路径 `node_mo
 - Tailwind 4 跟随 symlink 扫描真实文件,CSS 体积从 23KB 跳到 45KB,`bg-popover`/`text-popover-foreground`/`size-4`/`rounded-md` 等关键 class 全部生成
 
 `packages/tap-note-editor/README.md` "Tailwind 4 样式接入"小节同步更新,记录 Bun 1.3 特殊处理与路径层级注意,提醒集成方 `@source` 路径是相对当前 CSS 文件解析、静默跳过不报错这一排查线索。
+
+### 15.9 BlockNote 样式 CSS 未加载修复(T-8.2 人工验证反馈)
+
+`@source` 路径修复后,slash 菜单样式有了,但编辑器内 list/heading/color 切换仍无效果。排查发现 build 产物 CSS 里 `.bn-block`/`.bn-block-content`/`.bn-inline-content` 都是 0 次,`--bn-colors-*` 变量也缺。
+
+根因:
+- `@blocknote/shadcn` 的 `src/BlockNoteView.tsx` 第 17 行 `import "./style.css"`,但打包成 `dist/blocknote-shadcn.js` 时 CSS import 被移除(`grep -c "style.css" dist/blocknote-shadcn.js` = 0)
+- 这是库打包的标准做法:CSS 由集成方显式加载,避免重复打包
+- 官方示例 `examples/01-basic/09-shadcn/src/App.tsx` 显式 `import "@blocknote/shadcn/style.css"`,我之前漏了这步
+
+修复:
+- `packages/tap-note-editor/src/tap-note-editor.tsx` 顶部加 `import '@blocknote/shadcn/style.css'`
+- `@blocknote/shadcn/dist/style.css` 实际包含 core + react + shadcn 的所有 `bn-*` 类、块类型样式(heading/bullet/numbered/checklist)、颜色变量(`--bn-colors-*`),只 import 这一个文件即可
+- 新增 `packages/tap-note-editor/src/vite-env.d.ts` 声明 `declare module '*.css'`,让 TypeScript 接受 CSS side-effect import
+- `packages/tap-note-editor/tsconfig.json` 的 `include` 加 `src/**/*.d.ts`
+- `packages/tap-note-editor/README.md` 更新:集成方无需再显式 import BlockNote CSS(编辑器包已内置),但仍需配置 Tailwind 4 `@source` 让 shadcn 组件 utility class 生成
+
+验证:CSS 体积 45KB → 69KB(+24KB BlockNote 样式),`.bn-block`/`.bn-block-content`/`.bn-inline-content`/33 个 `--bn-colors-*` 变量/`data-content-type=heading`/`data-text-color` 全部生成。typecheck/lint/test 全绿。
+
+**P1 切自研 base-ui 皮肤时(§15.7)**,这个 CSS import 会被移除 —— 自研皮肤会把样式直接打包进包,不依赖 `@blocknote/shadcn/style.css`。

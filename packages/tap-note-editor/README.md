@@ -50,7 +50,9 @@ const editor = useCreateTapNoteEditor({ initialContent });
 
 ## Tailwind 4 样式接入(独立集成方必读)
 
-`@blocknote/shadcn` 基于 Tailwind 4 + shadcn CSS 变量,独立集成时必须配置:
+`@tap-note/editor` 内部已 `import "@blocknote/shadcn/style.css"`,加载 BlockNote 的 `bn-*` 类、块类型样式(heading/bullet/numbered/checklist)、颜色变量(`--bn-colors-*`)。集成方**无需**再显式 import BlockNote CSS。
+
+但仍需配置 Tailwind 4 让 shadcn 组件用到的 utility class 生成:
 
 ### 1. `@source` 指令
 
