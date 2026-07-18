@@ -34,7 +34,7 @@ flowchart LR
 
 - 无表单字段；操作为块编辑手势。
 - `initialContent` 非法时兜底空文档 + console.warn，不向用户抛错。
-- `editable=false` 时只读，块不可拖拽。
+- `editable=false` 时只读：块不可拖拽或缩进，slash 菜单不唤起，格式工具栏不执行编辑命令。
 
 ## 4. 加载、空状态、错误状态与权限状态
 
@@ -47,7 +47,7 @@ flowchart LR
 
 - 现代桌面 Chromium/Firefox/Safari 最新两个大版本（总 PRD §11）。
 - 编辑器主区域优先保留可编辑面积；窄屏时由 FEAT-006 demo 决定侧边栏折叠。
-- 样式需与 `@workspace/ui` 作用域隔离（待确认，见 tech §13）。
+- 默认使用 `@blocknote/shadcn` 完整组件基线；仅对通过接口验证的宿主组件做局部覆盖。独立集成须按 README 配置 Tailwind 对 `@blocknote/shadcn` 的 `@source` 扫描（见 tech §9、§13）。
 
 ## 6. UI 验收标准
 
@@ -65,5 +65,5 @@ flowchart LR
 
 ## 8. 待确认事项
 
-- shadcn 与 `@workspace/ui` 样式作用域隔离方案（同 tech §13）。
+- `@workspace/ui` 的 base-ui Button 是否可安全作为 BlockNote shadcn 的局部 override（同 tech §13）；不通过时保持 `@blocknote/shadcn` 默认组件。
 - MVP 是否同时提供英文（总 PRD §17 item 6），当前以 zh-CN 为默认。

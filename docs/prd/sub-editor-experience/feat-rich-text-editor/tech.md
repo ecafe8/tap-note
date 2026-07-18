@@ -2,7 +2,7 @@
 
 ## 0. 文档信息
 
-- 功能 ID：FEAT-001；所属 Sub：SUB-002；状态：草稿；依据：总 PRD v8、SUB-002 `tech.md`。
+- 功能 ID：FEAT-001；所属 Sub：SUB-002；状态：草稿；依据：总 PRD v9、SUB-002 `tech.md`。
 
 ## 1. 当前项目事实与复用点
 
@@ -28,7 +28,9 @@
 packages/tap-note-editor/
 ├── package.json            # name=@tap-note/editor, exports
 ├── tsconfig.json
-├── tsup.config.ts          # 构建配置（待确认，见 §11）
+├── eslint.config.js
+├── bunfig.toml             # bun:test preload 配置
+├── test/                   # happy-dom 与 Testing Library preload 脚本
 └── src/
     ├── index.ts            # 对外导出
     ├── tap-note-editor.tsx # TapNoteEditor 组件
@@ -43,7 +45,7 @@ packages/tap-note-editor/
 ## 4. 组件接口
 
 ```ts
-// 方案草稿，待与 FEAT-002 对齐助手实例类型
+// 助手实例类型待与 FEAT-002/003/004 对齐
 interface TapNoteEditorProps {
   initialContent?: PartialBlock[]
   editable?: boolean                // default true
@@ -51,16 +53,19 @@ interface TapNoteEditorProps {
   onChange?: (blocks: Block[]) => void
   inlineAssistant?: TapNoteInlineAssistant  // 来自 FEAT-003，可选
   chatAssistant?: TapNoteChatAssistant    // 来自 FEAT-004，可选
+  aiBusyState?: TapNoteAIBusyState
+  shadCNComponents?: Partial<ShadCNComponents>
   dictionary?: Partial<TapNoteDictionary>
 }
 ```
 
-`useCreateTapNoteEditor(options)` 返回 `{ editor, ref }`，`editor` 暴露 `insertBlocks`/`updateBlock`/`removeBlocks` 等 BlockNote API 供 FEAT-002 applier 调用。
+`useCreateTapNoteEditor(options)` 返回 editor 实例，暴露 `insertBlocks`/`updateBlock`/`removeBlocks` 等 BlockNote API 供 FEAT-002 applier 调用；当前不承诺额外 DOM ref，后续只有出现明确测量或滚动场景才新增。
 
 ## 5. 数据模型与状态变化
 
 - 文档状态为 BlockNote 内部 Prosemirror doc；`onChange` 输出 `Block[]`。
 - 编辑器不持有 AI busy 状态；由 FEAT-002 `createAIBusyState` 逐会话创建，经 props/注入传入，编辑器据此呈现入口禁用。
+- `@blocknote/shadcn` 的 `ShadCNDefaultComponents` 是独立包的完整默认组件基线；`shadCNComponents` 只接受通过接口验证的局部覆盖，不直接导入私有 `@workspace/ui`。
 - 无迁移、无持久化（纯组件）。
 
 ## 6. 核心流程与错误处理
@@ -68,13 +73,14 @@ interface TapNoteEditorProps {
 ```text
 挂载 TapNoteEditor
   -> useCreateBlockNote({ initialContent })
-  -> BlockNoteView (shadcn 皮肤, editable, theme)
+  -> BlockNoteView (shadcn 默认组件 + 可选局部 override, editable, theme)
   -> BlockNoteView onChange -> 转换为 Block[] -> props.onChange
 ```
 
 错误处理：
 - `initialContent` 非法：try/catch 兜底空文档 + console.warn，不抛错。
 - 助手注入版本不匹配：存在性检查失败时 console.warn 并忽略，不阻断编辑。
+- `editable=false`：禁用编辑、slash 唤起、格式化命令、拖拽与缩进操作。
 
 ## 7. 权限、安全、输入校验与隐私
 
@@ -84,6 +90,7 @@ interface TapNoteEditorProps {
 
 ## 8. 测试策略
 
+- 使用 `bun:test`；通过 `bunfig.toml` 的 `[test].preload` 加载 happy-dom 与 Testing Library 初始化脚本。
 - 组件测试：props（initialContent/editable/theme/onChange）渲染与回调断言。
 - 装配测试：注入/不注入助手两种情形，断言入口显隐。
 - 跨 sub 集成：模型选择、AI 互斥、刷新无持久化（由 FEAT-006 E2E 覆盖）。
@@ -95,6 +102,7 @@ interface TapNoteEditorProps {
 - 以 semver 维护公开 props；破坏性 schema/API 变更须同 FEAT-007 发布说明。
 - UI 回归可回滚独立 web 部署；包回滚通过上一稳定 npm 版本，不改变集成方文档数据。
 - `exports` 字段、类型声明、tsup/vite 构建配置在 P1 由 FEAT-007 统一落地；MVP 阶段可在 monorepo 内以 workspace 直接消费，暂不发布 npm。
+- 独立集成时，宿主必须按 README 配置 Tailwind 对 `@blocknote/shadcn` 的 `@source` 扫描；不能只依赖 monorepo 的 `packages/ui/src/styles/globals.css`。
 
 ## 10. 类似产品与开源方案调研
 
@@ -110,9 +118,11 @@ interface TapNoteEditorProps {
 |---|---|---|---|---|
 | `@blocknote/core` | 0.51.4 | MPL-2.0 | sub tech.md Context7 | 实施前以 lockfile 再次确认 |
 | `@blocknote/react` | 0.51.4 | MPL-2.0 | 同上 | 同上 |
-| `@blocknote/shadcn` | 0.51.4 | MPL-2.0 | 同上 | 与 `@workspace/ui` 样式隔离待实测 |
+| `@blocknote/shadcn` | 0.51.4 | MPL-2.0 | 同上 | 默认完整组件基线；宿主仅可做局部 override |
 | `react` | ^19 | MIT | 代码库现状 | peerDep |
 | `tailwindcss` | ^4 | MIT | 代码库现状 | peerDep |
+| `@happy-dom/global-registrator` | 待 T-010 锁定 | MIT | Bun 官方文档 | 仅测试 devDependency |
+| `@testing-library/react` / `jest-dom` | 待 T-010 锁定 | MIT | Bun 官方文档 | 仅测试 devDependency |
 
 > 实施前必须用 Context7 查询 BlockNote 最新稳定 API 与版本兼容性，并以最小 demo 验证 React 19 + BlockNote 0.51.4 组合，锁定到 workspace lockfile。
 
@@ -121,15 +131,16 @@ interface TapNoteEditorProps {
 - 备选 A：直接暴露 BlockNote UI（不封装）。优点：工作量小；缺点：无法稳定 tap-note 公开 API，集成方升级易碎。排除。
 - 备选 B：包装一层 `TapNoteEditor`（采纳）。维护成本略增，但满足产品目标（稳定 API、授权干净、可发布）。
 - 构建工具：tsup vs vite 库模式——待 P1 FEAT-007 统一决策，MVP 不阻塞。
-- shadcn 组件复用策略（总 PRD v8 §9、§17 item 23）：三段优先级——① 优先复用 `@workspace/ui` 已有 shadcn 官方组件；② API 不兼容时降级为 `@blocknote/shadcn` 自带组件；③ 需深度定制或规避版权时参考 `resource/BlockNote` 源码自定义组件。具体落到哪一段由 T-001 实测确认（`@workspace/ui` 基于 base-ui，非 radix，`shadCNComponents` 兼容性为风险点）。
-- 测试框架（总 PRD v8 §17 item 24）：采用 `bun:test`，与 Bun 工具链统一，不引入 Vitest；React 组件测试需配合 `happy-dom` + `@testing-library/react`（版本由 FEAT-001 T-010 锁定）。
-- 参考代码（总 PRD v8 §9、§17 item 22）：`resource/BlockNote` submodule 为首要参考来源，实现优先阅读源码再独立编写，不复制受保护表达。
+- shadcn 组件复用策略（总 PRD v9 §9、§17 item 23）：独立包默认使用 `@blocknote/shadcn` 的 `ShadCNDefaultComponents`；`shadCNComponents` 只接受通过 `Partial<ShadCNComponents>` 兼容性验证的局部宿主 override。当前 `@workspace/ui` 仅有基于 base-ui 的 Button，不能假定提供 Select/Popover 等完整组件组；不兼容时保持默认基线，需深度定制时参考源码独立实现。
+- shadcn CLI（总 PRD v9 §17 item 25）：若需新增宿主 shadcn 组件，先通过 Context7 查询当前官方安装命令、依赖与 Tailwind 兼容要求，再执行 CLI。
+- 测试框架（总 PRD v9 §17 item 24）：采用 `bun:test`，以 `bunfig.toml` preload 注册 happy-dom 与 Testing Library 初始化脚本；具体版本由 FEAT-001 T-010 锁定。
+- 参考代码（总 PRD v9 §9、§17 item 22）：`resource/BlockNote` submodule 为首要参考来源，实现优先阅读源码再独立编写，不复制受保护表达。
 
 ## 13. 技术风险与待确认
 
-- shadcn 样式与 `@workspace/ui`（base-ui + tailwind-merge@3）的样式作用域冲突尚未实测（总 PRD §17 item 3）。已有三段降级策略（§12），具体落到哪一段由 T-001 实测。
-- `@workspace/ui` base-ui 组件 API 是否满足 `BlockNoteView.shadCNComponents` 期望——核心兼容风险，T-001 实测确认。
+- `@blocknote/shadcn` 默认组件与宿主 Tailwind 4 `@source`/CSS 变量的集成尚未实测；独立集成与 monorepo 集成均须验证。
+- `@workspace/ui` base-ui Button 是否可作为 `shadCNComponents.Button.Button` 的局部 override 尚待实测；不通过则保持 `ShadCNDefaultComponents`，不阻塞 MVP。
 - BlockNote 精确 API 与依赖版本须实施前以官方文档 + lockfile 确认。
 - npm scope `@tap-note/*` 待用户确认（总 PRD §17 item 8）。
-- `@blocknote/shadcn` 自带 radix + tailwind-merge@2 与 `@workspace/ui` tailwind-merge@3 共存方案待实测。
-- `happy-dom`/`@testing-library/react` 与 React 19 + `bun:test` 的具体版本须 T-010 锁定。
+- `@blocknote/shadcn` 自带 Radix + tailwind-merge@2；若宿主局部 override 使用 base-ui，需验证同页共存，但默认基线不依赖 `@workspace/ui`。
+- `@happy-dom/global-registrator`/`@testing-library/react` 与 React 19 + `bun:test` 的具体版本须 T-010 锁定。

@@ -3,12 +3,12 @@
 ## 0. 文档信息
 
 - 产品名称：tap-note
-- 文档版本：v8
+- 文档版本：v9
 - 文档状态：草稿
 - 创建日期：2026-07-17
 - 最后更新：2026-07-17
 - 输出路径：`docs/prd/main-prd.md`
-- 需求来源：用户初始构想（基于 BlockNote 开发支持 AI 助手的在线文档编辑器）+ 技术方案讨论结论（v2：AI 助手拆分为内联/对话两类 + 共享核心；v3：并发互斥、上下文体积策略、纯组件定位、demo 多路由；v4：导出提级 P1、体积阈值确认、client-side tools 不限危险操作；v5：导出包定义、集成方字体配置与字体脚本工具方向；v6：正式 Sub 分组与 FEAT 唯一归属；v7：安全鉴权、操作一致性、导出边界与授权合规订正；v8：参考代码规则与 shadcn 组件复用策略）
+- 需求来源：用户初始构想（基于 BlockNote 开发支持 AI 助手的在线文档编辑器）+ 技术方案讨论结论（v2：AI 助手拆分为内联/对话两类 + 共享核心；v3：并发互斥、上下文体积策略、纯组件定位、demo 多路由；v4：导出提级 P1、体积阈值确认、client-side tools 不限危险操作；v5：导出包定义、集成方字体配置与字体脚本工具方向；v6：正式 Sub 分组与 FEAT 唯一归属；v7：安全鉴权、操作一致性、导出边界与授权合规订正；v8：参考代码规则与 shadcn 组件复用策略；v9：独立包 shadcn 基线与 CLI 安装前文档查询规则）
 
 ## 1. 产品背景
 
@@ -409,7 +409,7 @@ tap-note 要解决的问题：
 - **本地化规则**：默认 zh-CN；保留 i18n 扩展点以便后续增补 en 等。
 - **版本规则**：依赖版本由官方文档、lockfile 与最小端到端验证共同确定；升级 AI SDK、Provider、BlockNote 或 React 前，必须验证 editor/chat 流式工具调用、客户端执行与类型检查。TypeScript 保持 `~6`（最新 6.x），不升级到 7.x（等生态适配）。
 - **规范适用规则**：本项目为 Hono + Vite + React 的纯 Web 项目，仅遵循 hono 与 JS/TS 通用编码规范；**不涉及 Taro/小程序规范**，相关规则对本项目不生效。
-- **参考代码规则**：本地仓库 `resource/BlockNote` 为 git submodule（仅参考，不参与构建），是各 `@tap-note/*` 包实现 BlockNote 集成、AI 助手状态机、流式工具解析、suggest-changes 集成、PDF/DOCX schema mapping 等内容时的**首要参考来源**；实现时优先阅读其源码理解 API、算法与交互模式，再独立编写代码，保留独立设计与实现来源记录，不复制受保护表达。`@blocknote/xl-*` 仅作实现**思路**参考（不复制源码、不引入依赖）；`@blocknote/core`/`react`/`shadcn`（MPL-2.0）可作为生产依赖。**shadcn 组件复用策略**：编辑器与导出等需要 shadcn 组件的场景按优先级处理——① 优先复用 `@workspace/ui` 已有 shadcn 官方组件；② API 不兼容时降级为 `@blocknote/shadcn` 自带组件；③ 仍不满足或需深度定制时，参考 `resource/BlockNote` 源码自定义组件（便于后续修改与规避版权）。具体策略由对应 feat 在 `tech.md` 记录。
+- **参考代码规则**：本地仓库 `resource/BlockNote` 为 git submodule（仅参考，不参与构建），是各 `@tap-note/*` 包实现 BlockNote 集成、AI 助手状态机、流式工具解析、suggest-changes 集成、PDF/DOCX schema mapping 等内容时的**首要参考来源**；实现时优先阅读其源码理解 API、算法与交互模式，再独立编写代码，保留独立设计与实现来源记录，不复制受保护表达。`@blocknote/xl-*` 仅作实现**思路**参考（不复制源码、不引入依赖）；`@blocknote/core`/`react`/`shadcn`（MPL-2.0）可作为生产依赖。**shadcn 组件复用策略**：独立发布包默认使用依赖自身提供的完整兼容组件基线（例如 `@blocknote/shadcn` 的默认组件），不得硬依赖私有 `@workspace/ui`。需要覆盖时按优先级处理——① 复用经 `ShadCNComponents` 接口兼容性验证的 `@workspace/ui` 或宿主 shadcn 组件，且仅局部覆盖；② 保持或回退 `@blocknote/shadcn` 自带组件；③ 仍不满足或需深度定制时，参考 `resource/BlockNote` 源码独立实现组件（便于后续修改与规避版权）。通过 shadcn CLI 安装或更新组件前，必须先用 Context7 查询对应版本的 shadcn 官方文档，确认当前安装命令、依赖和 Tailwind 兼容要求；不得按记忆或旧命令安装。具体策略由对应 feat 在 `tech.md` 记录。
 
 ## 11. 全局非功能需求
 
@@ -573,8 +573,9 @@ tap-note 要解决的问题：
 20. **【已决策】** server-api 不管理终端用户账号，也不向浏览器分发长期共享 Token；生产调用由集成方 BFF 或外部身份提供方签发短期 JWT，server-api 校验标准声明后提供 AI 服务。
 21. **【已决策】** 对话工具 schema 由服务端版本化维护，客户端只执行同名工具并回传结果；不引用模式不允许模型按需读取全文。
 22. **【已决策】** 本地仓库 `resource/BlockNote` submodule 为各 `@tap-note/*` 包实现 BlockNote 集成、AI 助手、流式工具、suggest-changes、导出 schema mapping 等内容时的首要参考来源；实现优先阅读源码再独立编写，不复制受保护表达，保留独立设计来源记录。
-23. **【已决策】** shadcn 组件复用三段优先级策略：① 优先复用 `@workspace/ui` 已有 shadcn 官方组件；② API 不兼容时降级为 `@blocknote/shadcn` 自带组件；③ 需深度定制或规避版权时参考 `resource/BlockNote` 源码自定义组件。
+23. **【已决策】** shadcn 组件复用策略：独立发布包默认使用依赖自身提供的完整兼容组件基线；仅在通过 `ShadCNComponents` 接口验证后，局部复用 `@workspace/ui` 或宿主组件；不兼容时保持或回退 `@blocknote/shadcn` 自带组件；需深度定制或规避版权时参考 `resource/BlockNote` 源码独立实现。
 24. **【已决策】** 测试框架采用 `bun:test`（与 Bun 工具链统一，不额外引入 Vitest）。
+25. **【已决策】** 通过 shadcn CLI 安装或更新 UI 组件前，必须先通过 Context7 查询当前 shadcn 官方文档，确认安装命令、依赖与 Tailwind 兼容要求；不得按记忆、旧命令或参考源码直接安装。
 
 ## 18. 变更记录
 
@@ -588,3 +589,4 @@ tap-note 要解决的问题：
 | v6 | 2026-07-17 | 按用户确认的 6 个需求分支重组总 PRD：新增 §6 需求分支地图（SUB-001 字体集成工具、SUB-002 编辑器体验、SUB-003 AI 助手、SUB-004 AI 服务平台、SUB-005 文档导出、SUB-006 开发者生态），原功能模块地图调整为 §7 并增加唯一所属 Sub 与嵌套 `sub-*/feat-*` 目录路径；原功能模块说明调整为 §8 并为全部 FEAT 补 Sub 归属。新增 FEAT-011「字体集成工具」归属 SUB-001；更新 P1、用户故事、授权规则、验收标准和待确认事项。后续由 `/oc-prd-sub` 为尚未建文档的 Sub 生成分支文档，由 `/oc-prd-feat` 创建 feat 文档。 |
 | v7 | 2026-07-17 | 按 PRD 审查结论订正安全性、可实现性和交付边界：① 生产 AI 网关改为验证集成方 BFF/外部身份提供方签发的短期 JWT，不向浏览器分发长期共享 Token；② AI busy 状态改为编辑器会话级，新增 documentRevision、操作前置条件与冲突/回退规则；③ 聊天工具改为服务端持有版本化 schema、客户端执行并按 toolCallId 回传；④ 明确全文引用的预算分层与不引用模式边界；⑤ 新增 FEAT-012 及 `@tap-note/export-markdown`/`@tap-note/export-html`，并在后续调整为 P2；⑥ 增加导出资源安全、成本限流、隐私日志、可访问性、SBOM/tarball 许可证扫描和 E2E 验收；⑦ 移除未经验证的 AI SDK 精确版本承诺，要求在实施前用 Context7 与最小示例锁定。 |
 | v8 | 2026-07-17 | 根据用户实施前确认补充：① 新增 §9「参考代码规则」——`resource/BlockNote` submodule 为各 `@tap-note/*` 包首要参考来源，实现优先阅读源码再独立编写，不复制受保护表达；② 新增 §9「shadcn 组件复用策略」三段优先级（`@workspace/ui` → `@blocknote/shadcn` 自带 → 参考源码自定义）；③ §17 新增 item 22/23/24 已决策（参考代码规则、shadcn 复用策略、测试框架采用 `bun:test`）。 |
+| v9 | 2026-07-17 | 按 FEAT-001 实施方案复核订正：① 独立发布包默认采用依赖自带的完整兼容组件基线，不硬依赖私有 `@workspace/ui`；② `@workspace/ui`/宿主组件仅在 `ShadCNComponents` 接口验证后局部覆盖，不兼容时保留或回退 `@blocknote/shadcn` 默认组件；③ 通过 shadcn CLI 安装/更新组件前必须用 Context7 查询当前官方安装、依赖与 Tailwind 文档；④ §17 新增 item 25。 |

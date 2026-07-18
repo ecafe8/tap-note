@@ -5,10 +5,10 @@
 - 功能 ID：FEAT-001
 - 所属 Sub：SUB-002 编辑器体验
 - 所属产品：tap-note
-- 总 PRD：`docs/prd/main-prd.md`（v8）
+- 总 PRD：`docs/prd/main-prd.md`（v9）
 - Sub PRD：`docs/prd/sub-editor-experience/prd.md`
 - 功能目录：`docs/prd/sub-editor-experience/feat-rich-text-editor/`
-- 文档版本：v1
+- 文档版本：v2
 - 文档状态：草稿
 
 ## 1. 功能目标
@@ -21,7 +21,7 @@
 
 - `TapNoteEditor` 组件与 `useCreateTapNoteEditor` hook；
 - BlockNote shadcn 皮肤装配、默认主题、slash 菜单、格式工具栏；
-- 受控/非受控编辑器实例与文档变更回调（`onChange`）；
+- 非受控编辑器实例、文档变更回调（`onChange`）与 hook 实例访问；
 - 编辑器实例与可选助手挂载点（`inlineAssistant` / `chatAssistant`）的注入接口；
 - 可编辑状态（`editable`）、主题切换的对外 props。
 
@@ -67,12 +67,14 @@ flowchart LR
 | 需求 ID | 需求描述 | 优先级 | 验收标准 |
 |---|---|---|---|
 | FR-001 | 提供 `TapNoteEditor` 组件，接受 `initialContent`（BlockNote blocks JSON） | P0 | 传入合法 blocks 后渲染可编辑文档，回车建块、`/` slash、拖拽重排、缩进嵌套、格式工具栏可用 |
-| FR-002 | 提供 `useCreateTapNoteEditor` hook 暴露受控/非受控实例 | P0 | hook 返回 editor 实例，可传入助手并执行 blocks 操作 |
+| FR-002 | 提供 `useCreateTapNoteEditor` hook 暴露 editor 实例 | P0 | hook 返回 editor 实例，供 ai-core applier 调用 blocks 操作 |
 | FR-003 | 支持 `editable`、`theme`、`onChange` props | P0 | `editable=false` 不可编辑；主题切换生效；`onChange` 在文档变更时触发并给出最新 blocks |
 | FR-004 | 预装 shadcn 皮肤、slash 菜单与格式工具栏 | P0 | 开箱即见 Notion 风格 UI，无需集成方手工装配 |
-| FR-005 | 提供助手挂载点（`inlineAssistant`/`chatAssistant` 可选注入） | P0 | 注入助手实例后其入口可用；未注入时不报错且不出现 AI 入口 |
+| FR-005 | 提供助手挂载点（`inlineAssistant`/`chatAssistant` 可选注入） | P0 | 组件接受并保留助手引用；未注入时不报错且不出现 AI 入口；入口本体由 FEAT-003/004 提供 |
 | FR-006 | 默认 zh-CN 文案，字典可替换 | P0 | 默认中文，可传入字典覆盖 |
 | FR-007 | 发布包授权干净 | P0 | `dependencies` 不含 `@blocknote/xl-*` 或任何 GPL/AGPL 依赖 |
+| FR-008 | 呈现来自 ai-core 的会话 busy 状态 | P0 | AI busy 时编辑器配合禁用相应入口并提供文字说明；busy 逻辑仍由 FEAT-002 所有 |
+| FR-009 | 提供可访问的编辑器基础交互 | P0 | 块编辑、slash 菜单与格式工具栏支持键盘操作、焦点恢复与屏幕阅读器状态提示 |
 
 ## 7. 业务规则
 
@@ -83,7 +85,7 @@ flowchart LR
 
 ## 8. 数据输入与输出
 
-- 输入：`initialContent`（`PartialBlock[]`）、`editable`、`theme`、`onChange`、可选 `inlineAssistant`/`chatAssistant` 实例、可选字典。
+- 输入：`initialContent`（`PartialBlock[]`）、`editable`、`theme`、`onChange`、可选 `inlineAssistant`/`chatAssistant` 实例、可选 ai-core busy state、可选字典。
 - 输出：editor 实例（经 hook）与文档变更回调；不承诺后端契约。
 - 领域边界为 `PartialBlock[]` / BlockNote editor 实例；持久化语义属集成方。
 
@@ -101,7 +103,7 @@ flowchart LR
 
 - `initialContent` 非法：兜底渲染空文档并 console.warn，不抛错阻断渲染。
 - BlockNote 版本与 React 19 不兼容：在依赖锁定阶段以最小 demo 验证，不在运行时降级。
-- 样式与 `@workspace/ui` 冲突：按样式作用域隔离方案处理（待确认，见 §12）。
+- 宿主 Tailwind 未按 README 配置 `@source`/CSS 变量：BlockNote shadcn 样式可能缺失；按独立样式接入方案处理（待确认，见 §12）。
 - 助手实例与编辑器版本不匹配：注入方负责保证版本一致；编辑器只做存在性检查。
 
 ## 11. 功能验收标准
@@ -112,15 +114,19 @@ flowchart LR
 4. 发布包 `dependencies` 不含 `@blocknote/xl-*` 或 GPL/AGPL 依赖。
 5. 默认 zh-CN，字典可替换。
 6. `bun run typecheck`、`bun run lint` 全绿；组件测试覆盖 props 与装配。
+7. 不导出存储 API，刷新后的内容丢失符合纯组件约定（总 PRD §16 item 17）。
+8. 编辑器基础交互符合总 PRD §16 item 23 的可访问性要求。
 
 ## 12. 待确认事项
 
-- 【总 PRD §17 item 3】`@blocknote/shadcn`（自带 radix + tailwind-merge@2）与 `@workspace/ui`（base-ui + tailwind-merge@3）的样式作用域是否冲突，是否需构建期样式隔离方案。需 P0 实施时实测。
+- 【总 PRD §17 item 23】独立包默认使用 `@blocknote/shadcn` 的完整默认组件；`@workspace/ui` 或宿主组件仅能在 `ShadCNComponents` 接口验证后局部覆盖。具体覆盖范围与样式隔离方案需 P0 实施时实测。
 - 【总 PRD §17 item 8】npm scope `@tap-note/*` 仍待用户确认。
 - 【AI 推断】BlockNote 精确 API 与依赖版本须在本 feat 实施前以官方文档与 lockfile 再次确认（sub tech.md 已记 Context7 结论）。
+- 【总 PRD §17 item 25】若需通过 shadcn CLI 新增宿主组件，先查询 Context7 当前官方文档，再执行安装。
 
 ## 13. 变更记录
 
 | 版本 | 日期 | 变更内容 |
 |---|---|---|
 | v1 | 2026-07-17 | 基于总 PRD v7 与 SUB-002 文档创建。 |
+| v2 | 2026-07-17 | 对齐总 PRD v9 与实施方案复核：明确编辑器为非受控模型；订正 hook/助手职责；新增 busy 与可访问性需求；独立包默认使用 `@blocknote/shadcn` 组件基线，仅允许验证后的局部宿主 override；新增 shadcn CLI 安装前 Context7 查询要求。 |
