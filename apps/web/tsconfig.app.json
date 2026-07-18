@@ -23,6 +23,8 @@
     "noFallthroughCasesInSwitch": true,
     "paths": {
       "@/*": ["./src/*"],
+      "@tap-note/editor": ["../../packages/tap-note-editor/src/index.ts"],
+      "@tap-note/editor/*": ["../../packages/tap-note-editor/src/*"],
       "@workspace/ui/*": ["../../packages/ui/src/*"]
     }
   },

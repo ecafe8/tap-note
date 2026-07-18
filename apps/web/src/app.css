@@ -1,0 +1,56 @@
+/*
+ * tap-note editor 冒烟样式(TODO(FEAT-006): 多路由 demo 接管后清理)
+ *
+ * BlockNote 默认不限制编辑器高度,集成方需要自行设置 .bn-container / .bn-editor
+ * 才能实现"全屏可滚动"或"固定高度"布局。这里采用 Notion 风格:
+ *   - .bn-container: 居中、限宽、上下留白
+ *   - .bn-editor: 占满剩余视口高度,内容超出时内部滚动
+ * 详见 packages/tap-note-editor/README.md "Tailwind 4 样式接入"。
+ */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+.tap-note-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.tap-note-app-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tap-note-app-editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tap-note-app-editor > [data-tap-note-editor] {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+.tap-note-app-editor .bn-container {
+  width: 100%;
+  max-width: 731px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem 4rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tap-note-app-editor .bn-editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}

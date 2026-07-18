@@ -8,6 +8,7 @@
     "lint": "turbo lint",
     "format": "turbo format",
     "typecheck": "turbo typecheck",
+    "test": "turbo test",
     "submodule:init": "git submodule update --init --recursive --progress",
     "docs": "mdts ./docs -p 8881"
   },
