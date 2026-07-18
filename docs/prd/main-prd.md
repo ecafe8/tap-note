@@ -3,12 +3,12 @@
 ## 0. 文档信息
 
 - 产品名称：tap-note
-- 文档版本：v9
+- 文档版本：v10
 - 文档状态：草稿
 - 创建日期：2026-07-17
-- 最后更新：2026-07-17
+- 最后更新：2026-07-18
 - 输出路径：`docs/prd/main-prd.md`
-- 需求来源：用户初始构想（基于 BlockNote 开发支持 AI 助手的在线文档编辑器）+ 技术方案讨论结论（v2：AI 助手拆分为内联/对话两类 + 共享核心；v3：并发互斥、上下文体积策略、纯组件定位、demo 多路由；v4：导出提级 P1、体积阈值确认、client-side tools 不限危险操作；v5：导出包定义、集成方字体配置与字体脚本工具方向；v6：正式 Sub 分组与 FEAT 唯一归属；v7：安全鉴权、操作一致性、导出边界与授权合规订正；v8：参考代码规则与 shadcn 组件复用策略；v9：独立包 shadcn 基线与 CLI 安装前文档查询规则）
+- 需求来源：用户初始构想（基于 BlockNote 开发支持 AI 助手的在线文档编辑器）+ 技术方案讨论结论（v2：AI 助手拆分为内联/对话两类 + 共享核心；v3：并发互斥、上下文体积策略、纯组件定位、demo 多路由；v4：导出提级 P1、体积阈值确认、client-side tools 不限危险操作；v5：导出包定义、集成方字体配置与字体脚本工具方向；v6：正式 Sub 分组与 FEAT 唯一归属；v7：安全鉴权、操作一致性、导出边界与授权合规订正；v8：参考代码规则与 shadcn 组件复用策略；v9：独立包 shadcn 基线与 CLI 安装前文档查询规则；v10：MVP 用 `@blocknote/shadcn` 默认基线，P1 切自研 base-ui 皮肤）
 
 ## 1. 产品背景
 
@@ -492,6 +492,7 @@ tap-note 要解决的问题：
 | **[v5]** PDF/DOCX 参考 XL exporter 思路但不复制源码 | (A) 直接依赖 XL exporter (B) 自研兼容实现 | 用户要求参考源码实现；发布包需保持授权干净 | 需自研 schema mapping、字体、图片、表格和未支持 block 策略 |
 | **[v6]** 按 6 个 Sub 重组产品需求 | (A) 单层 FEAT (B) 5 个 Sub（字体并入导出）(C) 6 个 Sub（字体独立） | 用户选 C；字体资源、许可证与安装工具具有独立边界，且已创建独立 sub 文档 | 新增 SUB-001~006；所有 FEAT 归属唯一 Sub；新增 FEAT-011 字体集成工具 |
 | **[v7]** 安全与可实现性订正 | (A) 延续共享 Bearer Token/全局 busy/客户端工具声明 (B) JWT、会话级状态、服务端工具 schema | 审查发现前者会暴露网关凭据、阻塞无关编辑器实例并造成 API 契约歧义 | 明确 JWT 边界、revision 冲突策略、受限上下文读取；新增 FEAT-012、资源安全和许可证门禁 |
+| **[v10]** MVP 编辑器皮肤采用 `@blocknote/shadcn` 默认基线，P1 切自研 base-ui 皮肤 | (A) MVP 即自研 base-ui 皮肤 (B) MVP 用 `@blocknote/shadcn`，P1 切自研 (C) 长期依赖 `@blocknote/shadcn` | 用户选 B；MVP 焦点是端到端可运行编辑器，自研皮肤 5-10 天工作量足以撑满独立 change，不应阻塞 MVP；P1 切 base-ui 可对齐 `packages/ui` 栈、彻底解决 Bun 1.3 隔离式 node_modules + Tailwind 4 `@source` 的工程问题、让发布包不传递依赖 radix | MVP 阶段：修 `@source` 路径让 `@blocknote/shadcn` 样式可见；P1 新开 `replace-shadcn-skin-with-base-ui` change，重写 14 个组件 section + `components.ts` 适配层 + `BlockNoteView` 等价物，更新 `@tap-note/editor` design Decision 3 与 `editor` spec |
 
 ## 15. 版本规划
 
@@ -512,6 +513,7 @@ tap-note 要解决的问题：
 - `/api/ai/proxy` 透明代理 + `createProxyTransport`（ClientSideTransport 等价能力，供内联可选）。
 - 更多 BlockNote 块类型适配（表格、代码块等在 BlockOperation schema 中的覆盖验证）。
 - 主题与样式作用域隔离方案落地（`@blocknote/shadcn` vs `@workspace/ui`）。
+- **[v10] 自研 base-ui 编辑器皮肤**：新开 `replace-shadcn-skin-with-base-ui` change，参考 `@blocknote/shadcn` 源码用 `packages/ui` 的 base-ui + Tailwind 4 + shadcn 栈重写 14 个组件 section + `components.ts` 适配层 + `BlockNoteView` 等价物；解除 `@tap-note/editor` 对 radix 的传递依赖，对齐 `packages/ui`，彻底解决 Bun 1.3 隔离式 node_modules 与 Tailwind 4 `@source` 的工程问题。MPL-2.0 重写需保留独立设计来源记录，不复制 `components.ts` 的逻辑结构。
 - 对话助手工具调用结果展示增强（diff 预览、跳转到被修改块）。
 - **FEAT-008~011 文档导出与字体集成**：发布 `@tap-note/export-core`、`@tap-note/export-pdf`、`@tap-note/export-docx`、`@tap-note/font-tools`。导出核心不依赖 `apps/server-api`；浏览器返回 Blob，Node.js/Hono 提供 Uint8Array/Response 适配。
 - PDF/DOCX 参考 BlockNote `xl-pdf-exporter`/`xl-docx-exporter` 的转换思路，但发布包不得直接依赖 GPL XL exporter。PDF 中文字体由集成方提供，DOCX 通过 `eastAsia` 字体配置或模板指定；后续提供字体检查、下载、裁剪、转换和注册脚本工具。
@@ -590,3 +592,4 @@ tap-note 要解决的问题：
 | v7 | 2026-07-17 | 按 PRD 审查结论订正安全性、可实现性和交付边界：① 生产 AI 网关改为验证集成方 BFF/外部身份提供方签发的短期 JWT，不向浏览器分发长期共享 Token；② AI busy 状态改为编辑器会话级，新增 documentRevision、操作前置条件与冲突/回退规则；③ 聊天工具改为服务端持有版本化 schema、客户端执行并按 toolCallId 回传；④ 明确全文引用的预算分层与不引用模式边界；⑤ 新增 FEAT-012 及 `@tap-note/export-markdown`/`@tap-note/export-html`，并在后续调整为 P2；⑥ 增加导出资源安全、成本限流、隐私日志、可访问性、SBOM/tarball 许可证扫描和 E2E 验收；⑦ 移除未经验证的 AI SDK 精确版本承诺，要求在实施前用 Context7 与最小示例锁定。 |
 | v8 | 2026-07-17 | 根据用户实施前确认补充：① 新增 §9「参考代码规则」——`resource/BlockNote` submodule 为各 `@tap-note/*` 包首要参考来源，实现优先阅读源码再独立编写，不复制受保护表达；② 新增 §9「shadcn 组件复用策略」三段优先级（`@workspace/ui` → `@blocknote/shadcn` 自带 → 参考源码自定义）；③ §17 新增 item 22/23/24 已决策（参考代码规则、shadcn 复用策略、测试框架采用 `bun:test`）。 |
 | v9 | 2026-07-17 | 按 FEAT-001 实施方案复核订正：① 独立发布包默认采用依赖自带的完整兼容组件基线，不硬依赖私有 `@workspace/ui`；② `@workspace/ui`/宿主组件仅在 `ShadCNComponents` 接口验证后局部覆盖，不兼容时保留或回退 `@blocknote/shadcn` 默认组件；③ 通过 shadcn CLI 安装/更新组件前必须用 Context7 查询当前官方安装、依赖与 Tailwind 文档；④ §17 新增 item 25。 |
+| v10 | 2026-07-18 | 按 FEAT-001 实施人工验证反馈决策：① MVP 编辑器皮肤维持 `@blocknote/shadcn` 默认基线，新开 P1 change `replace-shadcn-skin-with-base-ui` 用 base-ui + 最新 shadcn 重写皮肤；② §14 新增 v10 决策记录权衡（MVP 不被 5-10 天重写工作量阻塞，P1 切 base-ui 对齐 `packages/ui` 栈、解除 radix 传递依赖、解决 Bun 1.3 + Tailwind 4 `@source` 工程问题）；③ §15 P1 增列自研 base-ui 皮肤工作。MVP 阶段仅修 `@source` 路径让 `@blocknote/shadcn` 样式可见，不重写皮肤。 |

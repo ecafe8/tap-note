@@ -81,7 +81,8 @@ monorepo demo 在 `packages/ui/src/styles/globals.css` 增加 BlockNote 的 Tail
 
 ## Open Questions
 
-- BlockNote 目标版本最终是否保持 `0.51.4`，由 T-001 的官方文档、registry 和最小 demo 结果决定。
-- `@workspace/ui` 的 Button 是否能作为局部 `shadCNComponents` override，只有实测通过后才决定；它不是本 change 的阻塞依赖。
-- `@tap-note/*` 最终 npm scope 仍由总 PRD 待确认；本 change 暂按 `@tap-note/editor` 作为 workspace 包名。
+- BlockNote 目标版本最终是否保持 `0.51.4`,由 T-001 的官方文档、registry 和最小 demo 结果决定。
+- `@workspace/ui` 的 Button 是否能作为局部 `shadCNComponents` override,只有实测通过后才决定;它不是本 change 的阻塞依赖。
+- `@tap-note/*` 最终 npm scope 仍由总 PRD 待确认;本 change 暂按 `@tap-note/editor` 作为 workspace 包名。
 - happy-dom 与 Testing Library 的具体版本由安装时 lockfile 和 Bun 兼容性确定。
+- **[P1 候选]** `@blocknote/shadcn` 与 Bun 1.3 隔离式 node_modules + Tailwind 4 `@source` 的工程问题已暴露(MVP 用修 `@source` 路径绕过)。P1 新开 `replace-shadcn-skin-with-base-ui` change,参考 `@blocknote/shadcn` 源码用 `packages/ui` 的 base-ui + 最新 shadcn + Tailwind 4 重写 14 个组件 section + `components.ts` 适配层 + `BlockNoteView` 等价物。届时更新本 change 的 Decision 3 与 `editor` spec "提供兼容的 shadcn 组件基线" requirement。MPL-2.0 重写需保留独立设计来源记录。详见 `docs/prd/main-prd.md` v10 决策与 `docs/prd/sub-editor-experience/feat-rich-text-editor/tech.md` §15.7。

@@ -246,3 +246,45 @@ monorepo 集成只需追加一行 `@source`;独立集成方需按 README 配置 
 - 不接受 `deps` 参数(对比官方 `useCreateBlockNote(options, deps)`),因为非受控模型下 editor 不应在 props 变化时重建,集成方需要重建时用 `key` 即可
 
 `tap-note-editor.tsx` 的 `useAIBusy` 用 `useSyncExternalStore` 不受影响,仍正确订阅 busy 状态。11 个组件测试全绿,无回归。
+
+### 15.7 编辑器皮肤决策(MVP 用 @blocknote/shadcn,P1 切自研 base-ui)
+
+人工验证发现 `@blocknote/shadcn` 样式不工作,根因是 Bun 1.3 隔离式 node_modules + Tailwind 4 `@source` 的工程兼容问题(`@blocknote/shadcn` 装在 `node_modules/.bun/<pkg>+<hash>/node_modules/@blocknote/shadcn`,根 `node_modules/@blocknote/` 不存在,Tailwind 4 默认 `@source` 路径扫不到)。
+
+讨论两个方案:
+- **A. 修 `@source` 路径**:继续用 `@blocknote/shadcn`,工程修复让样式可见
+- **B. 重写皮肤**:参考 `@blocknote/shadcn` 源码,用 `packages/ui` 的 base-ui + Tailwind 4 + 最新 shadcn 栈自己实现一套 BlockNote 皮肤,彻底解决 `@source` 问题 + 对齐 `packages/ui` 栈
+
+**决策(v10)**:MVP 走 A,P1 切 B。
+
+理由:
+1. MVP 焦点是端到端可运行编辑器,B 方案 5-10 天工作量(14 个组件 section + `components.ts` 适配层 + `BlockNoteView` 等价物)足以撑满独立 change,不应塞进 FEAT-001 阻塞 MVP
+2. P1 切 B 的收益清晰:对齐 `packages/ui` 全栈 base-ui、解除 `@tap-note/editor` 对 radix 的传递依赖、彻底解决 Bun 1.3 + Tailwind 4 `@source` 工程问题、视觉迭代与 `packages/ui` 一致
+3. `components.ts` 是 BlockNote 私有契约(没有公开文档,要逆向 `@blocknote/react` 源码),P1 时有充足时间做这个逆向工作
+4. MPL-2.0 重写有合规边界:不能复制 `components.ts` 的逻辑结构,需要真正的独立设计 + 保留来源记录,P1 时可从容处理
+
+P1 新开 change `replace-shadcn-skin-with-base-ui`,届时同步更新:
+- 本 feat `tech.md` §12 备选方案 B 决策记录
+- `openspec/changes/add-rich-text-editor/design.md` Decision 3(改为"自研 base-ui 皮肤")
+- `openspec/changes/add-rich-text-editor/specs/editor/spec.md` "提供兼容的 shadcn 组件基线" requirement(改为"提供 base-ui 皮肤")
+- 本 feat `dev-plan.md` 不变,P1 时由新 change 接管皮肤工作
+
+MVP 阶段仅修 `@source` 路径(指向 Bun 1.3 真实 hoisting 路径 `node_modules/.bun/node_modules/@blocknote/shadcn` symlink 或带 hash 的真实路径),让 `@blocknote/shadcn` 样式可见,完成 T-6.5/T-8.2/T-8.3 人工验证。
+
+### 15.8 `@source` 路径修复(T-8.2 人工验证反馈)
+
+人工验证发现编辑器与 slash 菜单完全无样式。根因排查链:
+
+1. **Bun 1.3 隔离式 hoisting**:`@blocknote/shadcn` 装在 `node_modules/.bun/@blocknote+shadcn@0.51.4+<hash>/node_modules/@blocknote/shadcn`,根 `node_modules/@blocknote/` **不存在**(Bun 1.3 不创建根级 symlink,与 npm/pnpm/yarn 不同)。`.bun/node_modules/@blocknote/shadcn` 是稳定 symlink,不带 hash。
+2. **Tailwind 4 `@source` 路径层级数错**:`packages/ui/src/styles/globals.css` 在第 4 层深度(`packages/ui/src/styles/`),回到 monorepo 根需要 4 个 `../`。我之前用了 3 个 `../`(`../../../node_modules/...`),路径解析到 `packages/node_modules/`(不存在),Tailwind 4 静默跳过不报错。
+3. **静默跳过不报错**:Tailwind 4 对不存在的 `@source` 路径不报警,utility class 直接不生成,导致 `bg-popover`/`text-popover-foreground`/`size-4`/`rounded-md` 等 BlockNote shadcn 组件用到的关键 class 全缺,编辑器与 slash 菜单无样式。
+
+修复:
+- `packages/ui/src/styles/globals.css` 的所有 `@source` 路径从 3 个 `../` 改为 4 个 `../`:
+  - `../../../../apps/**/*.{ts,tsx}`
+  - `../**/*.{ts,tsx}`(相对路径,扫 `packages/ui/src/`)
+  - `../../../../node_modules/.bun/node_modules/@blocknote/shadcn`(Bun 1.3 symlink)
+  - `../../../../node_modules/@blocknote/shadcn`(npm/pnpm/yarn 标准路径,Bun 下不存在但无害)
+- Tailwind 4 跟随 symlink 扫描真实文件,CSS 体积从 23KB 跳到 45KB,`bg-popover`/`text-popover-foreground`/`size-4`/`rounded-md` 等关键 class 全部生成
+
+`packages/tap-note-editor/README.md` "Tailwind 4 样式接入"小节同步更新,记录 Bun 1.3 特殊处理与路径层级注意,提醒集成方 `@source` 路径是相对当前 CSS 文件解析、静默跳过不报错这一排查线索。

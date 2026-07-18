@@ -54,11 +54,20 @@ const editor = useCreateTapNoteEditor({ initialContent });
 
 ### 1. `@source` 指令
 
-在宿主 Tailwind CSS 入口添加(路径相对宿主项目根目录):
+在宿主 Tailwind CSS 入口添加(路径相对宿主项目根目录,通常 `../node_modules/@blocknote/shadcn` 即可,因为多数包管理器在根 `node_modules/@blocknote/` 创建 symlink 或真实目录):
 
 ```css
 @source "../node_modules/@blocknote/shadcn";
 ```
+
+> **Bun 1.3 隔离式 hoisting 特殊处理**:Bun 1.3 不在根 `node_modules/@blocknote/` 创建 symlink,包真实位置在 `node_modules/.bun/<pkg>+<hash>/node_modules/@blocknote/shadcn`,但 `node_modules/.bun/node_modules/@blocknote/shadcn` 是稳定的 symlink 路径。Bun 用户需要追加:
+> ```css
+> @source "../node_modules/.bun/node_modules/@blocknote/shadcn";
+> @source "../node_modules/@blocknote/shadcn";
+> ```
+> Tailwind 4 会跟随 symlink 扫描真实文件,并静默跳过不存在的路径,所以两条都加是安全的(适配 npm/pnpm/yarn/Bun)。
+
+> **路径层级注意**:`@source` 路径是相对**当前 CSS 文件**解析的。在 monorepo 中,如果样式表在 `packages/<pkg>/src/styles/globals.css`(第 4 层深度),需要 4 个 `../` 回到 monorepo 根:`../../../../node_modules/...`。Tailwind 4 静默跳过不存在路径,路径错了不会报错,但 utility class 不生成 —— 这是排查"样式全无"的关键线索。
 
 ### 2. shadcn CSS 变量
 
