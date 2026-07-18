@@ -133,7 +133,7 @@ flowchart TD
 
 - 【总 PRD §17 item 13】token 估算算法：近似字符数/4 vs 精确 tiktoken。当前以近似算法为方案草稿，实施前确认。
 - 【总 PRD §17 item 11】对话 client-side tools 是否支持批量操作（当前假设严格单操作，多操作走多轮或多 tool call）。
-- 【总 PRD §17 item 5】AI SDK 精确版本与 transport/partial tool call API 须实施前以 Context7 + 最小示例锁定。
+- 【总 PRD §17 item 5 / v11 部分决策】AI SDK **v7** 锁定（见总 PRD §14 v11 决策）。v6→v7 breaking changes 已记录（`needsApproval`→`toolApproval`、`UIMessage.content`→`parts`、`DefaultChatTransport` 封装对象）。**仍待 FEAT-002 实施前以 Context7 + 最小示例验证**：v7 `DefaultChatTransport`/`streamText`/`UIMessage`/`UIMessageStream` 精确 API、partial tool call streaming、client-side tools `execute`/tool result 回传、`@ai-sdk/alibaba@2`/`@ai-sdk/google@4` 与 `ai@7` 的 peerDep 兼容性。
 - 【AI 推断】`@handlewithcare/prosemirror-suggest-changes` 与 BlockNote 0.51.4 的兼容性须最小端到端验证。
 
 ## 13. 变更记录

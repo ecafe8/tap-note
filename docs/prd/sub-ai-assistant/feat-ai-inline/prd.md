@@ -134,7 +134,7 @@ flowchart TD
 
 ## 12. 待确认事项
 
-- 【总 PRD §17 item 5】AI SDK 精确版本与 partial tool call streaming 的精确 API，须在本 feat 实施前以 Context7 与最小端到端示例确认并锁定。
+- 【总 PRD §17 item 5 / v11 部分决策】AI SDK **v7** 锁定（见总 PRD §14 v11 决策）。v6→v7 breaking changes 已记录。**仍待 FEAT-003 实施前以 Context7 + 最小示例验证**：v7 partial tool call streaming 精确 API、`@ai-sdk/alibaba@2`/`@ai-sdk/google@4` 与 `ai@7` 的 peerDep 兼容性。
 - 【AI 推断】`TapNoteAIInlineExtension` 与 BlockNote `createExtension` API 的兼容性须实施前以官方文档确认。
 - 【SUB-003 §6】suggest-changes 与 BlockNote 版本交互、流中人工编辑冲突需最小端到端验证。
 - 【总 PRD §5.2】`needsApproval` 审批开关为 P2 候选，当前不实现，UI 不应暗示存在该开关。

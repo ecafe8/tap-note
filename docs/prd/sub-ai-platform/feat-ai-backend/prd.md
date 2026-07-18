@@ -131,10 +131,10 @@ flowchart LR
 
 ## 12. 待确认事项
 
-- 【总 PRD §17 item 4】`defaultAgentModel` 导出缺失是否仅为保留脚手架占位。
-- 【总 PRD §17 item 5】AI SDK 具体稳定版本及 partial tool call streaming、client-side tools `execute`/tool result 回传的精确 API，须在本 feat 实施前以 Context7 与最小端到端示例确认并锁定。
+- 【总 PRD §17 item 4 / v11 已决策】AI SDK 锁定 v7（见总 PRD §14 v11 决策）。`apps/server-api` 脚手架的 v6 `ToolLoopAgent`/`createAgentUIStreamResponse` 与 `defaultAgentModel` 导出缺失，在 v7 下统一重写：补 `package.json`、`index.ts`，按 hono 规范补齐 `config/`、`middleware/`、`modules/`、`utils/`、`types/`、`errors/`；审批代理保留为独立示例但用 v7 API 重写。原 v6 脚手架不再保留。
+- 【总 PRD §17 item 5 / v11 部分决策】AI SDK v7 锁定。v6→v7 breaking changes 已记录（`needsApproval`→`toolApproval`、`UIMessage.content`→`parts`、`DefaultChatTransport` 封装对象）。**仍待 FEAT-005 实施前以 Context7 + 最小示例验证**：v7 `streamText`/`UIMessageStream`/`DefaultChatTransport` 精确 API、partial tool call streaming（内联用）、client-side tools `execute`/tool result 回传（对话用）、`@ai-sdk/alibaba@2`/`@ai-sdk/google@4` 与 `ai@7` 的 peerDep 兼容性、`ToolLoopAgent`/`createAgentUIStreamResponse` 是否在 v7 保留（不保留则重写审批代理）。
 - 【SUB-004 §11】精确 JWT claims、rate limit 存储、生产部署拓扑需由集成方确定。
-- 【AI 推断】Hono、`@hono/node-server`、AI SDK、`@ai-sdk/alibaba`、`@ai-sdk/google` 的精确版本须实施前以 Context7 与 lockfile 锁定。
+- 【AI 推断】Hono、`@hono/node-server`、AI SDK v7、`@ai-sdk/alibaba@2`、`@ai-sdk/google@4` 的精确版本须实施前以 Context7 与 lockfile 锁定。
 
 ## 13. 变更记录
 

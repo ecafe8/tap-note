@@ -144,7 +144,7 @@ flowchart TD
 
 ## 12. 待确认事项
 
-- 【总 PRD §17 item 5】AI SDK 精确版本与 client-side tools `execute`/tool result 回传的精确 API，须在本 feat 实施前以 Context7 与最小端到端示例确认并锁定。
+- 【总 PRD §17 item 5 / v11 部分决策】AI SDK **v7** 锁定（见总 PRD §14 v11 决策）。v6→v7 breaking changes 已记录（`needsApproval`→`toolApproval`、`UIMessage.content`→`parts`、`DefaultChatTransport` 封装对象）。**仍待 FEAT-004 实施前以 Context7 + 最小示例验证**：v7 client-side tools `execute`/tool result 回传精确 API、`useChat` + `DefaultChatTransport` 形状、`@ai-sdk/alibaba@2`/`@ai-sdk/google@4` 与 `ai@7` 的 peerDep 兼容性。
 - 【总 PRD §17 item 11】client-side tools 是否需要支持「批量操作」，还是严格单次单操作（当前假设严格单操作，多操作走多轮或多 tool call）。
 - 【总 PRD §17 item 13】token 估算算法待确认（影响上下文预算）。
 - 【总 PRD §5.2】`needsApproval` 审批开关为 P2 候选，当前不实现，UI 不应暗示存在该开关。

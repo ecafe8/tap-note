@@ -154,11 +154,11 @@ interface AIBusyState {
 | `@blocknote/core` | 0.51.4 | MPL-2.0 | sub tech.md | 仅类型与 blocks 操作 |
 | `@handlewithcare/prosemirror-suggest-changes` | 0.1.8 | 独立第三方（非 BlockNote/GPL） | 总 PRD 调研 | 规避 GPL 的关键；实施前再核对版本与兼容性 |
 | `prosemirror-state`/`view`/`model`/`transform` | 与 BlockNote 对齐 | MIT | — | peerDep 或 dep 待定 |
-| AI SDK (`ai`) | 待锁定 | Apache-2.0 | Context7 | transport/UIMessage 类型对齐，实施前锁定 |
+| AI SDK (`ai`) | **v7.0.x**（总 PRD v11 锁定） | Apache-2.0 | Context7 | transport/UIMessage 类型对齐，实施前 Context7 核查 v7 精确 API |
 | `zod` | 与 monorepo 一致 | MIT | 代码库现状 | — |
 | `react` | ^19 | MIT | — | peerDep（类型） |
 
-> 实施前必须用 Context7 查询 AI SDK transport API 与 `@handlewithcare/prosemirror-suggest-changes` 版本兼容性，并以最小端到端示例验证 suggest/apply/revert 与 BlockNote 交互，锁定到 workspace lockfile。
+> 实施前必须用 Context7 查询 AI SDK **v7** 的 `DefaultChatTransport`、`streamText`、`UIMessage`、`UIMessageStream` 精确 API（v6→v7 breaking changes：`needsApproval`→`toolApproval`、`UIMessage.content`→`parts` 数组、`DefaultChatTransport` 封装对象，见总 PRD §14 v11 决策），并以最小端到端示例验证 suggest/apply/revert 与 BlockNote 交互，锁定到 workspace lockfile。
 
 ## 12. 备选方案与决策
 
@@ -166,11 +166,13 @@ interface AIBusyState {
 - 单一 assistant 包：会混淆内联/对话不同状态机。排除。
 - 采纳：三包加共享 core（ai-core + ai-inline + ai-chat），共享 schema/transport/busy，各自状态机/executor。
 - token 估算：近似字符数/4（方案草稿，实施前确认是否需精确 tokenizer）。
+- AI SDK 版本：**锁定 v7**（总 PRD v11 决策），不降级到 v6；BlockNote `xl-ai` 的 v6 仅参考思路，实现时翻译 v6→v7 差异。
 
 ## 13. 技术风险与待确认
 
-- AI SDK 精确版本与 transport/partial tool call API 未锁定（总 PRD §17 item 5）——实施前阻塞项。
+- AI SDK **v7** 精确 API（`DefaultChatTransport`、`streamText`、`UIMessage`、`UIMessageStream`、partial tool call streaming、client-side tools `execute`/tool result 回传）须实施前以 Context7 + 最小端到端示例锁定（总 PRD §17 item 5，v11 部分决策）。
 - `@handlewithcare/prosemirror-suggest-changes` 与 BlockNote 0.51.4 的兼容性、流中人工编辑冲突需最小端到端验证（SUB-003 tech.md §6）。
 - token 估算算法待确认（总 PRD §17 item 13）。
 - 对话 client-side tools 是否支持批量操作（总 PRD §17 item 11，当前严格单操作）。
 - `prosemirror-*` 与 BlockNote 的版本对齐方式（peerDep vs dep）待确认。
+- `@ai-sdk/alibaba@2`/`@ai-sdk/google@4` 与 `ai@7` 的 peerDep 兼容性须实施前核查。
