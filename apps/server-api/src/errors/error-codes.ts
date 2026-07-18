@@ -1,0 +1,15 @@
+/**
+ * 错误码常量。用 `as const` 对象而非 enum,tree-shaking 友好。
+ */
+export const ERROR_CODES = {
+  SUCCESS: 'SUCCESS',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  AUTH_INVALID: 'AUTH_INVALID',
+  MODEL_NOT_ALLOWED: 'MODEL_NOT_ALLOWED',
+  CONTEXT_TOO_LARGE: 'CONTEXT_TOO_LARGE',
+  RATE_LIMITED: 'RATE_LIMITED',
+  AI_PROVIDER_ERROR: 'AI_PROVIDER_ERROR',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+} as const
+
+export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES]

@@ -1,12 +1,19 @@
-import type { HttpBindings } from "@hono/node-server";
-
-/** Variables injected by middleware into Hono's context */
+/**
+ * Hono 应用变量(中间件注入)。
+ */
 export interface AppVariables {
-  requestId?: string;
+  /** 请求唯一 ID(UUID v4)。 */
+  requestId?: string
+  /** JWT 校验后的 sub。 */
+  userId?: string
+  /** JWT 校验后的 scope 列表。 */
+  scopes?: string[]
 }
 
-/** Full Hono environment type used in `new Hono<AppEnv>()` */
+/**
+ * Hono 环境(Bindings 来自 @hono/node-server,Variables 来自中间件)。
+ */
 export interface AppEnv {
-  Bindings: HttpBindings;
-  Variables: AppVariables;
+  Bindings: Record<string, string | undefined>
+  Variables: AppVariables
 }
