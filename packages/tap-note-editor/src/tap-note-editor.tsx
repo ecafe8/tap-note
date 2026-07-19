@@ -32,7 +32,11 @@ export function TapNoteEditor(props: TapNoteEditorProps): React.ReactElement {
     dictionary,
   } = props
 
-  const editor = useCreateTapNoteEditor({ initialContent })
+  const extensions = useMemo(
+    () => inlineAssistant?.extension ? [inlineAssistant.extension] : undefined,
+    [inlineAssistant],
+  )
+  const editor = useCreateTapNoteEditor({ initialContent, extensions })
   const mergedDictionary = useMemo(
     () => mergeDictionary(tapNoteDictionaryZhCN, dictionary),
     [dictionary],

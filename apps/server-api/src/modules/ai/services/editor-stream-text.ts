@@ -1,5 +1,4 @@
-import { streamText, toUIMessageStream, convertToModelMessages } from 'ai'
-import { tool } from 'ai'
+import { streamText, convertToModelMessages, tool } from 'ai'
 import { injectDocumentStateMessages, estimateTokens } from '@tap-note/ai-core'
 import { env } from '../../../config/env'
 import { logger } from '../../../utils/logger'
@@ -77,12 +76,12 @@ export async function streamEditorText(
   })
 
   // 转为 UIMessageStream,错误掩码(不泄漏 Provider Key)
-  const stream = toUIMessageStream({
-    stream: result.toUIMessageStream() as never,
+  // 注意: result.toUIMessageStream() 已经返回 ReadableStream<UIMessageChunk>,
+  // 不要再包一层 toUIMessageStream()(会导致双重转换报错)
+  const stream = result.toUIMessageStream({
     onError: (error: unknown) => {
       const message = error instanceof Error ? error.message : String(error)
       logger.error({ requestId: ctx.requestId, error: message }, 'streamText error')
-      // 对外只返回稳定错误消息,不泄漏上游 Key 或内部路径
       if (/apiKey|api_key|secret|sk-/i.test(message)) {
         return 'AI provider call failed'
       }

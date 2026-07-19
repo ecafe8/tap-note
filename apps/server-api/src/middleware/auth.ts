@@ -9,7 +9,11 @@ import type { AppEnv } from '../types'
  */
 let cachedKey: { alg: string; key: CryptoKey } | undefined
 
-async function getKey(): Promise<{ alg: string; key: CryptoKey }> {
+async function getKey(): Promise<{ alg: string; key: CryptoKey } | undefined> {
+  // JWT 未配置时跳过鉴权(开发/演示模式)
+  if (!env.JWT_VERIFY_KEY) {
+    return undefined
+  }
   const alg = getJwtAlgorithms()[0] ?? 'RS256'
   if (cachedKey && cachedKey.alg === alg) {
     return cachedKey
@@ -40,11 +44,22 @@ async function getKey(): Promise<{ alg: string; key: CryptoKey }> {
  * - **先删除所有客户端 `X-User-*` 请求头**,再注入 `c.var.userId`/`c.var.scopes`
  * - 后端不无条件信任客户端 `X-User-*` 头
  *
+ * **JWT 未配置时跳过校验**(开发/演示模式)。生产环境集成方自行配置 JWT 鉴权。
  * 失败抛 `AuthError`,由 errorHandlerMiddleware 统一返回 401。
  */
 export const authMiddleware = (): MiddlewareHandler<AppEnv> => {
   return async (c, next) => {
-    // 1. 清理客户端伪造的 X-User-* 头
+    // 1. JWT 未配置时跳过鉴权(开发/演示模式)
+    const keyInfo = await getKey()
+    if (!keyInfo) {
+      // 开发模式:注入默认 userId
+      c.set('userId', 'dev-user')
+      c.set('scopes', ['ai:editor', 'ai:chat', 'ai:models'])
+      await next()
+      return
+    }
+
+    // 2. 清理客户端伪造的 X-User-* 头
     const headersToRemove: string[] = []
     c.req.raw.headers.forEach((_, name) => {
       if (name.toLowerCase().startsWith('x-user-')) {
@@ -55,15 +70,15 @@ export const authMiddleware = (): MiddlewareHandler<AppEnv> => {
       c.req.raw.headers.delete(name)
     }
 
-    // 2. 提取 Authorization: Bearer <jwt>
+    // 3. 提取 Authorization: Bearer <jwt>
     const auth = c.req.header('Authorization')
     if (!auth || !auth.startsWith('Bearer ')) {
       throw new AuthError('missing Bearer token')
     }
     const token = auth.slice(7)
 
-    // 3. 校验 JWT
-    const { key } = await getKey()
+    // 4. 校验 JWT
+    const { key } = keyInfo
     let payload: { sub?: string; scope?: string }
     try {
       const result = await jwtVerify(token, key, {
@@ -80,11 +95,11 @@ export const authMiddleware = (): MiddlewareHandler<AppEnv> => {
       throw new AuthError('JWT missing sub claim')
     }
 
-    // 4. 注入已验证的身份上下文
+    // 5. 注入已验证的身份上下文
     c.set('userId', payload.sub)
     c.set('scopes', payload.scope ? payload.scope.split(' ') : [])
 
-    // 5. 注入回 X-User-Sub 头(已验证的,非客户端伪造)
+    // 6. 注入回 X-User-Sub 头(已验证的,非客户端伪造)
     c.header('X-User-Sub', payload.sub)
 
     await next()

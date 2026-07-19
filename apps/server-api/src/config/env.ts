@@ -5,6 +5,9 @@ import { z } from 'zod'
  * 环境变量 Zod schema。
  * 启动时 `safeParse`,失败打印错误并 `process.exit(1)`(fail-fast)。
  * 业务代码统一通过 `env` 访问,不读 `process.env`。
+ *
+ * JWT 配置为可选:未配置时跳过 JWT 校验(开发/演示模式)。
+ * 生产环境集成方自行配置 JWT 鉴权。
  */
 const envSchema = z.object({
   /** DashScope(阿里云百炼)API Key,必填。 */
@@ -15,12 +18,12 @@ const envSchema = z.object({
   GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1).optional(),
   /** Google 自定义 base URL。 */
   GOOGLE_GENERATIVE_BASE_URL: z.string().url().optional(),
-  /** JWT 签发者(issuer)。 */
-  JWT_ISSUER: z.string().min(1, 'JWT_ISSUER is required'),
-  /** JWT 受众(audience)。 */
-  JWT_AUDIENCE: z.string().min(1, 'JWT_AUDIENCE is required'),
-  /** JWT 验证密钥(PEM 格式公钥用于 RS256/ES256,或字符串用于 HS256)。 */
-  JWT_VERIFY_KEY: z.string().min(1, 'JWT_VERIFY_KEY is required'),
+  /** JWT 签发者(可选,未配置时跳过 JWT 校验)。 */
+  JWT_ISSUER: z.string().optional(),
+  /** JWT 受众(可选)。 */
+  JWT_AUDIENCE: z.string().optional(),
+  /** JWT 验证密钥(可选,PEM 公钥或共享密钥)。 */
+  JWT_VERIFY_KEY: z.string().optional(),
   /** JWT 允许的签名算法(逗号分隔)。默认 `RS256,ES256`。 */
   JWT_ALGORITHMS: z.string().default('RS256,ES256'),
   /** 监听端口。默认 3000。 */
@@ -30,7 +33,7 @@ const envSchema = z.object({
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal'])
     .default('info'),
   /** 允许的 CORS Origin(逗号分隔)。 */
-  CORS_ORIGIN: z.string().min(1, 'CORS_ORIGIN is required'),
+  CORS_ORIGIN: z.string().default('http://localhost:5173'),
   /** 是否允许匿名访问 `/api/ai/models`(默认 false)。 */
   MODELS_PUBLIC: z
     .string()

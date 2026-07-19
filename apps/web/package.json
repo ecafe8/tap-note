@@ -12,6 +12,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tap-note/ai-core": "workspace:*",
+    "@tap-note/ai-inline": "workspace:*",
     "@tap-note/editor": "workspace:*",
     "@workspace/ui": "workspace:*",
     "lucide-react": "^1.24.0",

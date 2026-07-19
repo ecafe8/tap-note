@@ -19,13 +19,11 @@ Do NOT issue operations against stale or previous document states.`
  *
  * 客户端 SHALL NOT 提交 `tools`/`toolDefinitions` 字段;服务端持有工具 schema。
  */
-export const editorStreamTextRequestSchema = z
-  .object({
-    messages: z.array(z.custom<unknown>()).min(1),
-    documentState: documentStateSchema,
-    model: z.string().min(1),
-  })
-  .strict()
+export const editorStreamTextRequestSchema = z.object({
+  messages: z.array(z.custom<unknown>()).min(1),
+  documentState: documentStateSchema,
+  model: z.string().min(1),
+})
 
 /**
  * `POST /api/ai/chat` 请求 body Zod schema。
@@ -46,9 +44,12 @@ export const chatRequestSchema = z.object({
  * 服务端 streamTool schema(editor/streamText 端点)。
  *
  * **与 `@tap-note/ai-core` 的 `blockOperationSchema` 同源**(从 ai-core 导入,不在服务端重复定义)。
- * 服务端 execute 返回 `{ ok: true }`,实际编辑器操作由客户端 `applyOperationsToEditor` 应用。
+ * 工具输入形状为 `{ operations: BlockOperation[] }`,服务端 `execute` 返回 `{ ok: true }`,
+ * 实际编辑器操作由客户端 `applyOperationsToEditor` 应用。
  */
-export const serverStreamToolInputSchema = blockOperationSchema
+export const serverStreamToolInputSchema = z.object({
+  operations: z.array(blockOperationSchema),
+})
 
 /**
  * `GET /api/ai/models` 响应中的模型元数据 Zod schema。

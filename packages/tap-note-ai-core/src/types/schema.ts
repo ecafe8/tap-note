@@ -18,7 +18,7 @@ export const blockSchema: z.ZodType<Record<string, unknown>> = z.object({
   type: z.string().optional(),
   props: z.record(z.string(), z.unknown()).optional(),
   content: z
-    .union([z.string(), z.array(z.record(z.string(), z.unknown())), z.undefined()])
+    .union([z.string(), z.array(z.record(z.string(), z.unknown()))])
     .optional(),
   children: z.array(z.unknown()).optional(),
 }).catchall(z.unknown())

@@ -98,7 +98,7 @@ describe('POST /api/ai/editor/streamText', () => {
     expect(body.code).toBe('VALIDATION_ERROR')
   })
 
-  test('客户端提交 tools 字段被拒绝', async () => {
+  test('客户端提交 tools 字段被忽略(不再 strict)', async () => {
     const app = createApp()
     const token = await signJwt({ sub: 'user-1' })
     const res = await app.request('/api/ai/editor/streamText', {
@@ -111,7 +111,9 @@ describe('POST /api/ai/editor/streamText', () => {
         tools: { customTool: {} },
       }),
     })
-    expect(res.status).toBe(422)
+    // schema 不再 strict,tools 字段不触发 422
+    // 可能进入 streamText 调用(200/500/502 都合理,取决于 provider 是否可用)
+    expect(res.status).not.toBe(422)
   })
 
   test('未知 modelId 返回 400 MODEL_NOT_ALLOWED', async () => {

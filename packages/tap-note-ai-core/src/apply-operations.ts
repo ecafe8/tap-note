@@ -113,12 +113,15 @@ function suggestOperationsToEditor(
   // 前置条件检查:目标块 ID 存在
   const preconditionConflict = checkPreconditions(editor, operations)
   if (preconditionConflict) {
+    console.warn('[ai-core] precondition conflict', preconditionConflict)
     return preconditionConflict
   }
 
   // 构建事务,转换为建议事务,dispatch
+  let dispatched = false
   editor.exec((state, dispatch) => {
     if (!dispatch) {
+      console.warn('[ai-core] editor.exec has no dispatch')
       return false
     }
     const tr = state.tr
@@ -130,8 +133,16 @@ function suggestOperationsToEditor(
     }
     const suggestionTr = transformToSuggestionTransaction(tr, state)
     dispatch(suggestionTr)
+    dispatched = true
+    console.log('[ai-core] suggestion transaction dispatched', {
+      operations: operations.length,
+      steps: suggestionTr.steps.length,
+    })
     return true
   })
+  if (!dispatched) {
+    console.warn('[ai-core] no suggestion transaction dispatched')
+  }
   return
 }
 

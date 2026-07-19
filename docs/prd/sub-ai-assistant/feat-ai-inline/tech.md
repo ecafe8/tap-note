@@ -161,3 +161,73 @@ function createTapNoteInlineAssistant(options: {
 - `TapNoteAIInlineExtension` 与 BlockNote `createExtension` API 兼容性须实施前以官方文档确认。
 - suggest-changes 与 BlockNote 0.51.4 交互、流中人工编辑冲突需最小端到端验证（SUB-003 tech.md §6）。
 - `needsApproval` 审批开关为 P2 候选，当前不实现（总 PRD §5.2）。
+
+## 14. 研究闸门结论(T-001.1–1.6 完成)
+
+### 14.1 锁定版本
+
+| 包 | 版本 | 授权 | 备注 |
+|---|---|---|---|
+| `@blocknote/core` | 0.51.4 | MPL-2.0 | `createExtension` API |
+| `@blocknote/react` | 0.51.4 | MPL-2.0 | React hooks |
+| `ai` | 7.0.31 | Apache-2.0 | `readUIMessageStream` + `parsePartialJson` + `tool` |
+| `@tap-note/ai-core` | workspace:* | — | schema/applier/busy/transport/layerContext |
+| `react` | ^19 | MIT | peerDep |
+
+### 14.2 BlockNote `createExtension` API(T-001.1)
+
+通过 Context7 `/websites/blocknotejs` 与源码确认:
+
+- Extension 接口字段:`key: string`(必填)、`keyboardShortcuts?: Record<string, (ctx: { editor }) => boolean>`、`inputRules?: { find: RegExp, replace: (props) => PartialBlock | undefined }[]`、`prosemirrorPlugins?: Plugin[]`(源码字段名,文档简写为 `plugins`)、`tiptapExtensions?`、`mount?: (ctx: { dom, root, signal }) => void | OnDestroy`、`store?: Store<State>`、`blockNoteExtensions?`。
+- 用 `createExtension(factory)` 创建,传入 `BlockNoteEditor.create({ extensions: [...] })`。
+- BlockNote `AIExtensionInstance` API(参考,不复制源码):`store`(Tanstack Store 含 `aiMenuState`)、`openAIMenuAtBlock(blockID)`、`closeAIMenu()`、`acceptChanges()`、`rejectChanges()`、`retry()`、`abort(reason?)`、`setAIResponseStatus(status)`、`invokeAI(opts)`。
+
+### 14.3 BlockNote React hooks(T-001.2)
+
+- `@blocknote/react` 导出:`useCreateBlockNote`、`useEditorChange`、`useEditorSelectionChange`。
+- **无 `useFloatingMenu` 导出**。AIMenu 定位用 `editor.getTextCursorPosition()` + `editor.domElement` 手动计算,或用 `@floating-ui/react` 库(已有,`@blocknote/shadcn` 传递)。
+- UI 组件挂载:通过 `TapNoteEditor.inlineAssistant.mount(editor)` 回调,用 React `createPortal` 渲染到 `editor.domElement.parentElement`。
+
+### 14.4 流式消费方式(T-001.3)— 设计修正
+
+研究后**简化**流式消费方式:不用 `@ai-sdk/react` 的 `Chat` 类,改用 `fetch` + `readUIMessageStream`(从 `ai` 导入):
+
+1. 直接 `fetch(baseUrl, { method: 'POST', headers, body: JSON.stringify({ messages, documentState, model }), signal: abortSignal })`
+2. `readUIMessageStream({ stream: response.body! })` 返回 `ReadableStream<UIMessageChunk>`
+3. 喂给 `StreamToolExecutor` 处理 partial tool call
+
+**优势**:不需要 `@ai-sdk/react` 依赖;`readUIMessageStream` 已内置 SSE 协议解析;`fetch` 的 `signal` 直接支持 `AbortController`。
+
+**修正 design 决策 3**:从"用 `Chat` 类"改为"用 `fetch` + `readUIMessageStream`"。**修正 proposal 依赖**:移除 `@ai-sdk/react`,只保留 `ai`(peerDep)。
+
+### 14.5 AI SDK v7 partial tool call streaming(T-001.4)
+
+- `parsePartialJson` 从 `ai` 导入,返回 `{ state, value }`,其中 `state` 为 `'undefined-input' | 'successful-parse' | 'failed-parse' | 'repair'`。
+- `tool-call` chunk 的 `input` 字段为 JSON 字符串,可能分片到达(partial)。StreamToolExecutor 用 `parsePartialJson` 累积解析。
+- `readUIMessageStream` 返回的 `UIMessageChunk` 包含 `tool-call` 类型 chunks,每个 chunk 有 `{ type: 'tool-call', toolCallId, toolName, input }`。
+
+### 14.6 xl-ai 重写要点(T-001.5)
+
+阅读 `resource/BlockNote/packages/xl-ai/src/` 源码确认:
+
+- **`filterNewOrUpdatedOperations`**(`streamTool/filterNewOrUpdatedOperations.ts`):async generator,追踪 `numOperationsAppliedCompletely`,每次 chunk 的 operations 数组中:
+  - 已完全应用的操作跳过(`i < numOperationsAppliedCompletely`)
+  - 最后一个操作标记 `isPossiblyPartial: true`(可能是 partial)
+  - 流结束时,最后一个操作重新 emit 为 `isPossiblyPartial: false`(完整)
+- **`StreamToolExecutor`**(`streamTool/StreamToolExecutor.ts`):`TransformStream` 模式,输入 JSON 字符串或 Operation 对象,输出 `{ status: 'ok', chunk: Operation }`。用 `parsePartialJson` 解析,`StreamTool.validate` 校验,`StreamTool.executor` 执行。
+- **`AIExtension`**(`AIExtension.ts`):状态机 `user-input → thinking → ai-writing → user-reviewing → error`;`suggestChanges()` 插件安装;`acceptChanges`/`rejectChanges` 用 `applySuggestions`/`revertSuggestions`;`abort` 用 `AbortController`。
+- **`sendMessageWithAIRequest`**(`api/aiRequest/sendMessageWithAIRequest.ts`):`chat.sendMessage(message, { body: { toolDefinitions }, metadata: { documentState } })` 注入 per-call body。
+
+### 14.7 仍待确认风险
+
+- BlockNote `createExtension` 的 `prosemirrorPlugins` 字段在 0.51.4 源码中存在(已验证),但 Context7 文档简写为 `plugins` — 实现时用源码字段名 `prosemirrorPlugins`。
+- `readUIMessageStream` 的精确签名须实施时以 `ai` 类型定义确认(预计 `{ stream: ReadableStream<Uint8Array> }` → `ReadableStream<UIMessageChunk>`)。
+- AIMenu 定位无 `useFloatingMenu`,需手动用 `editor.getTextCursorPosition().block` + DOM `getBoundingClientRect` 计算位置。
+
+### 14.8 研究闸门放行结论
+
+T-001.1–1.6 全部有可复核结果(已写入 14.1–14.7)。
+
+**设计修正**:流式消费从"`Chat` 类"改为"`fetch` + `readUIMessageStream`";移除 `@ai-sdk/react` 依赖,只保留 `ai`(peerDep)。
+
+**放行进入第 2 组实现任务。**

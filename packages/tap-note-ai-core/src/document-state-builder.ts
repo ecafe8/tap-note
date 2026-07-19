@@ -1,4 +1,4 @@
-import type { BlockNoteEditor, PartialBlock } from '@blocknote/core'
+import { getNodeById, type BlockNoteEditor, type PartialBlock } from '@blocknote/core'
 import {
   DOCUMENT_STATE_FORMAT,
   documentStateSchema,
@@ -103,13 +103,23 @@ export function createDocumentStateBuilder(
         }
         // 无显式选区,回退到 affected
       }
-      // affected:光标所在块
+      // affected:光标所在块。BlockNote 可能为尾随空段落提供虚拟光标块,
+      // 该块不在 ProseMirror 文档中,不能作为 AI insertBlock 的 referenceBlockId。
       const cursor = safeGetTextCursorPosition(editor)
       if (!cursor) {
         return { blocks: [] }
       }
-      const block = cursor as PartialBlock
-      return { blocks: [block] }
+      const cursorBlock = cursor as PartialBlock
+      const cursorBlockExistsInDocument = cursorBlock.id
+        ? getNodeById(cursorBlock.id, editor.prosemirrorState.doc)
+        : undefined
+      if (cursorBlockExistsInDocument) {
+        return { blocks: [cursorBlock] }
+      }
+
+      // 虚拟尾随空块时,用最后一个真实顶层块作为可引用锚点。
+      const fallbackBlock = editor.document.at(-1)
+      return fallbackBlock ? { blocks: [fallbackBlock as PartialBlock] } : { blocks: [] }
     } catch {
       // 兜底:非法 editor 状态或空文档
       return { blocks: [] }

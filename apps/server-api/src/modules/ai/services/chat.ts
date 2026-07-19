@@ -1,4 +1,4 @@
-import { streamText, toUIMessageStream, convertToModelMessages, tool } from 'ai'
+import { streamText, convertToModelMessages, tool } from 'ai'
 import { z } from 'zod'
 import { injectDocumentStateMessages, estimateTokens } from '@tap-note/ai-core'
 import { env } from '../../../config/env'
@@ -70,8 +70,8 @@ export async function streamChat(
     },
   })
 
-  const stream = toUIMessageStream({
-    stream: result.toUIMessageStream() as never,
+  // 转为 UIMessageStream,错误掩码
+  const stream = result.toUIMessageStream({
     onError: (error: unknown) => {
       const message = error instanceof Error ? error.message : String(error)
       logger.error({ requestId: ctx.requestId, error: message }, 'chat streamText error')

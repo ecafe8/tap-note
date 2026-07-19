@@ -42,24 +42,24 @@ describe('editorStreamTextRequestSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  test('客户端提交 tools 字段被拒绝', () => {
+  test('客户端提交 tools 字段被忽略(不再 strict)', () => {
     const result = editorStreamTextRequestSchema.safeParse({
       messages: [{ id: 'u-1', role: 'user', parts: [] }],
       documentState: makeDocumentState(),
       model: 'dashscope:qwen-plus',
       tools: { someTool: {} },
     })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
-  test('客户端提交 toolDefinitions 字段被拒绝', () => {
+  test('客户端提交 toolDefinitions 字段被忽略(不再 strict)', () => {
     const result = editorStreamTextRequestSchema.safeParse({
       messages: [{ id: 'u-1', role: 'user', parts: [] }],
       documentState: makeDocumentState(),
       model: 'dashscope:qwen-plus',
       toolDefinitions: {},
     })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
   test('非法 documentState 抛 ZodError', () => {
@@ -71,14 +71,14 @@ describe('editorStreamTextRequestSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  test('extra 字段被拒绝(.strict)', () => {
+  test('extra 字段被忽略(不再 strict)', () => {
     const result = editorStreamTextRequestSchema.safeParse({
       messages: [{ id: 'u-1', role: 'user', parts: [] }],
       documentState: makeDocumentState(),
       model: 'dashscope:qwen-plus',
       extraField: 'bad',
     })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 })
 

@@ -1,0 +1,11 @@
+/* AI 建议内容样式。suggest-changes 使用原生 <ins>/<del> mark DOM。 */
+.bn-editor ins[data-inline="true"],
+.bn-editor ins[data-inline="false"] {
+  color: #8a8f98;
+}
+
+.bn-editor del[data-inline="true"],
+.bn-editor del[data-inline="false"] {
+  color: #8a8f98;
+  text-decoration: line-through;
+}

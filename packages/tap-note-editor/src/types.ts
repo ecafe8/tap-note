@@ -1,9 +1,11 @@
-import type { Block, BlockNoteEditor, PartialBlock } from '@blocknote/core'
+import type { Block, BlockNoteEditor, PartialBlock, ExtensionFactoryInstance } from '@blocknote/core'
 import type { ShadCNComponents } from '@blocknote/shadcn'
 import type { TapNoteDictionary } from './i18n/zh-cn'
 
 export interface TapNoteInlineAssistant {
   readonly __brand?: 'TapNoteInlineAssistant'
+  /** BlockNote 扩展实例(在 editor 创建时注册)。 */
+  readonly extension?: ExtensionFactoryInstance
   mount?: (editor: BlockNoteEditor) => void
   unmount?: (editor: BlockNoteEditor) => void
 }
@@ -40,6 +42,8 @@ export interface UseCreateTapNoteEditorOptions {
    * 通过 `useCreateTapNoteEditor` 的 `deps` 参数显式控制。
    */
   initialContent?: PartialBlock[]
+  /** BlockNote 扩展列表(在 editor 创建时注册)。 */
+  extensions?: ExtensionFactoryInstance[]
 }
 
-export type { Block, BlockNoteEditor, PartialBlock, ShadCNComponents, TapNoteDictionary }
+export type { Block, BlockNoteEditor, PartialBlock, ShadCNComponents, TapNoteDictionary, ExtensionFactoryInstance }
