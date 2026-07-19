@@ -155,7 +155,7 @@ export function createAIInlineExtension(options: CreateTapNoteInlineAssistantOpt
       let firstToolCall = true
       await processToolCallStream(
         stream,
-        (operations: BlockOperation[]) => {
+        async (operations: BlockOperation[]) => {
           console.log('[ai-inline] received operations:', JSON.stringify(operations, null, 2))
           if (firstToolCall) {
             firstToolCall = false
@@ -164,29 +164,69 @@ export function createAIInlineExtension(options: CreateTapNoteInlineAssistantOpt
             dispatch({ type: 'operations-updated', operations })
           }
 
-          // 应用操作到编辑器
-          console.log('[ai-inline] calling applyOperationsToEditor...')
-          try {
-            const result = applyOperationsToEditor(editorRef!, operations, {
-              mode: 'suggest',
-              currentDocumentRevision: frozenRevision,
-            })
-            console.log('[ai-inline] applyOperationsToEditor result:', result === undefined ? 'void(success)' : JSON.stringify(result).slice(0, 100))
+          // 逐块应用操作 + 延时,实现流式视觉效果
+          // 借鉴 BlockNote xl-ai 的 withDelays + delayAgentStep 设计
+          // (resource/BlockNote/packages/xl-ai/src/prosemirror/agent.ts)
+          //
+          // referenceIdMap:对同一 referenceBlockId 连续 insertBlock(position=after)的情况,
+          // 后续操作用上一次新插入块的 ID 作锚,避免反序。
+          // 借鉴 BlockNote xl-ai createAddBlocksTool.ts 的 referenceIdMap 设计。
+          const referenceIdMap: Record<string, string | undefined> = {}
 
-            // ConflictResult 处理
-            if (result && typeof result === 'object' && 'kind' in result) {
-              const conflict = result as ConflictResult
-              const message = conflict.reason === 'revision-mismatch'
-                ? dictionary.conflict
-                : dictionary.preconditionFailed
-              console.warn('[ai-inline] conflict:', conflict.reason)
-              dispatch({ type: 'error', error: message, conflict })
-              options.aiBusyState.release()
+          for (const op of operations) {
+            // 检查 abort
+            if (abortController.signal.aborted) {
+              console.log('[ai-inline] aborted, stopping per-op loop')
+              break
             }
-          } catch (err) {
-            console.error('[ai-inline] applyOperationsToEditor threw:', err)
-            dispatch({ type: 'error', error: err instanceof Error ? err.message : String(err) })
-            options.aiBusyState.release()
+
+            // 对 insertBlock + position=after,若有 mapped 的"上次插入块"则用它作 reference
+            let effectiveOp = op
+            if (op.type === 'insertBlock' && op.position === 'after' && op.referenceBlockId) {
+              const mapped = referenceIdMap[op.referenceBlockId]
+              if (mapped) {
+                effectiveOp = { ...op, referenceBlockId: mapped }
+              }
+            }
+
+            // 记录应用前的 block ID 集合,用于查找新插入块
+            const beforeIds = new Set(
+              editorRef!.document.map((b: { id?: string }) => b.id).filter((id): id is string => typeof id === 'string'),
+            )
+
+            try {
+              const result = applyOperationsToEditor(editorRef!, [effectiveOp], {
+                mode: 'suggest',
+                currentDocumentRevision: frozenRevision,
+              })
+              if (result && typeof result === 'object' && 'kind' in result) {
+                const conflict = result as ConflictResult
+                const message = conflict.reason === 'revision-mismatch'
+                  ? dictionary.conflict
+                  : dictionary.preconditionFailed
+                console.warn('[ai-inline] conflict on per-op:', conflict.reason, conflict.message)
+                dispatch({ type: 'error', error: message, conflict })
+                options.aiBusyState.release()
+                return
+              }
+            } catch (err) {
+              console.error('[ai-inline] per-op applyOperationsToEditor threw:', err)
+              dispatch({ type: 'error', error: err instanceof Error ? err.message : String(err) })
+              options.aiBusyState.release()
+              return
+            }
+
+            // insertBlock + after:记录新插入块 ID 到 referenceIdMap,供后续 op 用
+            if (op.type === 'insertBlock' && op.position === 'after' && op.referenceBlockId) {
+              const afterDoc = editorRef!.document
+              const newBlock = afterDoc.find((b: { id?: string }) => b.id && !beforeIds.has(b.id))
+              if (newBlock?.id) {
+                referenceIdMap[op.referenceBlockId] = newBlock.id
+              }
+            }
+
+            // 按操作类型延时:insert 快、update 慢(更内容更长)
+            await delayForOperation(op)
           }
         },
         (error: unknown) => {
@@ -341,4 +381,23 @@ export function createTapNoteInlineAssistant(
       options.aiBusyState.release()
     },
   }
+}
+
+/**
+ * 按操作类型延时,实现流式视觉效果。
+ *
+ * 借鉴 BlockNote xl-ai 的 `delayAgentStep`
+ * (`resource/BlockNote/packages/xl-ai/src/prosemirror/agent.ts`):
+ * - insert 类操作快(50ms),让块快速出现但不闪屏
+ * - update 类操作慢(100ms),内容更长需要更多视觉停留
+ * - delete 类操作快(50ms)
+ * 带 0.85-1.15 的 jitter 避免机械感。
+ */
+async function delayForOperation(op: BlockOperation): Promise<void> {
+  const jitter = Math.random() * 0.3 + 0.85
+  const base =
+    op.type === 'updateBlock' ? 100 :
+    op.type === 'insertBlock' ? 50 :
+    50
+  await new Promise((resolve) => setTimeout(resolve, base * jitter))
 }

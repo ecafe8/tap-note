@@ -56,12 +56,12 @@ export function filterNewOrUpdatedOperations(
  * 4. 非法 partial 丢弃,不中断流
  *
  * @param stream `ReadableStream<UIMessageChunk>`(来自 `readUIMessageStream`)
- * @param onOperations 回调,每次有新的完整操作时调用
+ * @param onOperations 回调,每次有新的完整操作时调用(支持 async,逐块应用时串行 await)
  * @param onError 回调,解析错误时调用(不中断流)
  */
 export async function processToolCallStream(
   stream: ReadableStream<UIMessageChunk>,
-  onOperations: (operations: BlockOperation[]) => void,
+  onOperations: (operations: BlockOperation[]) => void | Promise<void>,
   onError?: (error: unknown) => void,
 ): Promise<void> {
   const reader = stream.getReader()
@@ -86,7 +86,7 @@ export async function processToolCallStream(
           const parsed = await parsePartialJson(accumulatedJson)
           // repaired-parse 仍可能缺少后续字段,不能提前应用,否则会重复插入。
           if (parsed.state === 'successful-parse') {
-            lastEmittedFingerprint = tryApplyOperations(parsed.value, onOperations, numApplied, lastEmittedFingerprint, (n) => { numApplied = n })
+            lastEmittedFingerprint = await tryApplyOperations(parsed.value, onOperations, numApplied, lastEmittedFingerprint, (n) => { numApplied = n })
           }
         }
         continue
@@ -103,7 +103,7 @@ export async function processToolCallStream(
         // 用最终完整 JSON 再应用一次(确保最终状态正确)
         const parsed = await parsePartialJson(accumulatedJson)
         if (parsed.state === 'successful-parse') {
-          lastEmittedFingerprint = tryApplyOperations(parsed.value, onOperations, numApplied, lastEmittedFingerprint, (n) => { numApplied = n })
+          lastEmittedFingerprint = await tryApplyOperations(parsed.value, onOperations, numApplied, lastEmittedFingerprint, (n) => { numApplied = n })
         }
         continue
       }
@@ -118,13 +118,13 @@ export async function processToolCallStream(
 }
 
 /** 尝试从解析值中提取并去重操作,有新操作时回调 */
-function tryApplyOperations(
+async function tryApplyOperations(
   parsedValue: unknown,
-  onOperations: (operations: BlockOperation[]) => void,
+  onOperations: (operations: BlockOperation[]) => void | Promise<void>,
   numApplied: number,
   lastEmittedFingerprint: string,
   setNumApplied: (n: number) => void,
-): string {
+): Promise<string> {
   const value = parsedValue as { operations?: unknown[] } | null
   if (!value?.operations || !Array.isArray(value.operations)) return lastEmittedFingerprint
 
@@ -149,7 +149,7 @@ function tryApplyOperations(
   setNumApplied(newNumApplied)
 
   if (newOps.length > 0) {
-    onOperations(newOps.map(({ operation }) => operation))
+    await onOperations(newOps.map(({ operation }) => operation))
   }
   return fingerprint
 }
