@@ -71,5 +71,9 @@ function buildDocumentStateParts(state: {
       type: 'text',
       text: JSON.stringify(state.blocks),
     } as const,
+    {
+      type: 'text',
+      text: 'REMINDER: Block IDs in the document state above are SUFFIXED with `$`. For referenceBlockId / targetBlockId / targetBlockIds, copy the id EXACTLY as shown (including the trailing `$`). IDs without `$` are hallucinated and will be rejected. Never invent IDs.',
+    } as const,
   ]
 }

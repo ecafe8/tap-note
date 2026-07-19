@@ -13,7 +13,8 @@ FEAT-002 ai-core 已交付共享契约(schema/DocumentStateBuilder/busy/transpor
 - 选区引用:发送前编辑器侧保留选区高亮 + 消息气泡 chip,发送后清除编辑器侧高亮保留 chip 作为审计回执。
 - 默认 zh-CN 字典,**扩展** ai-core `AICoreDictionary`(不重复定义已有字段),可被集成方替换。
 - 集成方通过 `createTapNoteChatAssistant({ transport, documentStateBuilder, editor, model?, getAuthHeaders?, dictionary? })` 一行接入,返回的 `TapNoteChatAssistant` 实现 `packages/tap-note-editor` 已定义的 `{ mount(editor), unmount(editor), panel }` 接口。
-- **不修改** `packages/tap-note-editor`、`packages/tap-note-ai-core`、`packages/tap-note-ai-inline`、`apps/server-api` 的运行时代码。
+- **不修改** `packages/tap-note-editor`、`packages/tap-note-ai-core`、`packages/tap-note-ai-inline` 的运行时代码。
+- **修改** `apps/server-api/src/modules/ai/services/chat.ts`:把 FEAT-005 留下的 stub `chatClientSideTools`(单 `applyDocumentOperations` 工具 + `z.object({ operation: z.string() })` 占位 schema)替换为 6 个正式 client-side tools 声明(`insertBlock`/`updateBlock`/`deleteBlock`/`replaceBlocks`/`moveBlock`/`getDocumentSnapshot`),schema 从 ai-core `blockOperationSchema` 派生(不在服务端重新定义);服务端只声明 inputSchema 不 execute。其余 server-api 模块(routes/controller/providers/middleware 等)不修改。
 - **不引入** `@blocknote/xl-ai`(GPL)、任何 GPL/AGPL 依赖。
 - **不实现**:对话工具执行审批开关(`needsApproval` P2 候选)、批量操作(严格单次单操作)、移动端窄屏 sheet(由集成方实现)、npm 发布构建(MVP 阶段 workspace 直接消费)。
 - `apps/web` demo 改造:新增 sidemenu + `/inline`、`/chat`、`/both` 三路由作为 example;A4 纸面样式(灰色工作区 + 居中白纸 + 阴影)与右侧可开合抽屉布局均属 demo 自有样式与逻辑,不在 `@tap-note/ai-chat` 或 `@tap-note/editor` 包范围内,集成方可参考或自行修改;模型下拉调 `/api/ai/models`;Vite proxy `/api` → server-api。

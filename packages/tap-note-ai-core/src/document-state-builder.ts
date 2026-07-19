@@ -86,7 +86,7 @@ export function createDocumentStateBuilder(
     try {
       if (scope === 'full') {
         const blocks = collectAllBlocks(editor)
-        return { blocks }
+        return { blocks: suffixBlockIds(blocks) }
       }
       if (scope === 'selection') {
         const selection = editor.getSelection()
@@ -94,12 +94,12 @@ export function createDocumentStateBuilder(
           const blocks = selection.blocks as PartialBlock[]
           const ids = blocks.map((b) => b.id).filter((id): id is string => typeof id === 'string')
           if (ids.length >= 2) {
-            return { blocks, selection: { start: ids[0]!, end: ids[ids.length - 1]! } }
+            return { blocks: suffixBlockIds(blocks), selection: { start: `${ids[0]!}$`, end: `${ids[ids.length - 1]!}$` } }
           }
           if (ids.length === 1) {
-            return { blocks, selection: { start: ids[0]!, end: ids[0]! } }
+            return { blocks: suffixBlockIds(blocks), selection: { start: `${ids[0]!}$`, end: `${ids[0]!}$` } }
           }
-          return { blocks }
+          return { blocks: suffixBlockIds(blocks) }
         }
         // 无显式选区,回退到 affected
       }
@@ -114,12 +114,14 @@ export function createDocumentStateBuilder(
         ? getNodeById(cursorBlock.id, editor.prosemirrorState.doc)
         : undefined
       if (cursorBlockExistsInDocument) {
-        return { blocks: [cursorBlock] }
+        return { blocks: suffixBlockIds([cursorBlock]) }
       }
 
       // 虚拟尾随空块时,用最后一个真实顶层块作为可引用锚点。
       const fallbackBlock = editor.document.at(-1)
-      return fallbackBlock ? { blocks: [fallbackBlock as PartialBlock] } : { blocks: [] }
+      return fallbackBlock
+        ? { blocks: suffixBlockIds([fallbackBlock as PartialBlock]) }
+        : { blocks: [] }
     } catch {
       // 兜底:非法 editor 状态或空文档
       return { blocks: [] }
@@ -178,6 +180,22 @@ function collectAllBlocks(editor: BlockNoteEditor): PartialBlock[] {
   } catch {
     return []
   }
+}
+
+/**
+ * 给 `blocks` 数组中每个 block 的 `id` 加 `$` 后缀。
+ *
+ * 借鉴 BlockNote `xl-ai` 的 `suffixIds`(`resource/BlockNote/packages/xl-ai/src/api/promptHelpers/suffixIds.ts`)。
+ * 发给 LLM 的 `documentState.blocks` 中,所有 id 带上 `$` 后缀(如 `232e80f1-...$`),
+ * LLM 回传的 `referenceBlockId`/`targetBlockId` 也应带 `$`,客户端 `applyOperationsToEditor`
+ * 在 lookup 前透明剥掉(`stripIdSuffix`)。
+ *
+ * 这给 LLM 一个明显信号:这些 ID 是"应用层标记过的",复制时需保留后缀,
+ * 也让幻觉的纯 UUID(如 `a1b2c3d4-...`)在客户端 lookup 时找不到对应块而被
+ * `precondition-failed` 拦截。
+ */
+function suffixBlockIds<T extends { id?: string }>(blocks: T[]): T[] {
+  return blocks.map((b) => (b.id ? { ...b, id: `${b.id}$` } : b))
 }
 
 function safeGetTextCursorPosition(editor: BlockNoteEditor): PartialBlock | undefined {

@@ -1,0 +1,47 @@
+{
+  "name": "@tap-note/ai-chat",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "description": "TapNote AI 对话助手:位置无关的 TapNoteChatPanel、useTapNoteChat、client-side tools execute、tool-result-bubble、上下文三态引用。",
+  "scripts": {
+    "lint": "eslint",
+    "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@blocknote/core": "0.51.4",
+    "@blocknote/react": "0.51.4",
+    "@tap-note/ai-core": "workspace:*",
+    "zod": "^3.25.76 || ^4.1.8"
+  },
+  "peerDependencies": {
+    "ai": "7.0.31",
+    "@ai-sdk/react": "4.0.34",
+    "react": "^19",
+    "react-dom": "^19"
+  },
+  "devDependencies": {
+    "@ai-sdk/react": "4.0.34",
+    "@eslint/js": "^10",
+    "@happy-dom/global-registrator": "^18.0.0",
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "ai": "7.0.31",
+    "eslint": "^10",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "typescript": "~6",
+    "typescript-eslint": "^8"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  }
+}

@@ -49,29 +49,42 @@
 
 ### Requirement: 提供 `useTapNoteChat` hook
 
-系统 SHALL 提供 `useTapNoteChat` hook 封装 AI SDK v7 `useChat`,接收 transport(来自 ai-core `createServerTransport`)、clientTools、documentStateBuilder、editor、model 选项,返回 `{ messages, input, setInput, sendMessage, abort, status }`。`sendMessage(message)` SHALL 在发送前 `busy.acquire("chat")`,失败则输入框置灰;per-request 的 `documentState` 与 `documentRevision` SHALL 通过 `sendMessage(message, { body: { documentState, documentRevision } })` 动态注入请求 body。
+系统 SHALL 提供 `useTapNoteChat` hook 封装 AI SDK v7 `useChat`(使用 `onToolCall` + `addToolOutput` 模式,不使用 `tools: { execute }`),接收 transport(来自 ai-core `createServerTransport`)、`executeClientTool(toolName, input)` 回调、documentStateBuilder、editor、model 选项,返回 `{ messages, input, setInput, sendMessage, abort, status, addToolOutput, busy }`。`sendMessage(message)` SHALL 在发送前 `busy.acquire("chat")`,失败则输入框置灰;per-request 的 `documentState`、`documentRevision` 与 `contextMode` SHALL 通过 `sendMessage(message, { body: { documentState, documentRevision, contextMode, model } })` 动态注入请求 body。SHALL 配置 `sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls` 自动触发 tool result 提交。
 
 #### Scenario: 发送前 acquire busy
 
 - **WHEN** 用户在输入框输入消息并按 `Enter`(或点发送按钮)
 - **THEN** 系统 SHALL 先调用 `busy.acquire("chat")`
 - **WHEN** acquire 成功
-- **THEN** 系统 SHALL 通过 transport 发送 `{ messages, documentState?, documentRevision?, model }` 到 `/api/ai/chat`
+- **THEN** 系统 SHALL 通过 transport 发送 `{ messages, documentState?, documentRevision?, contextMode, model }` 到 `/api/ai/chat`
 - **WHEN** acquire 失败(另一 AI 进行中)
 - **THEN** 输入框 SHALL 置灰,显示 `AICoreDictionary.aiBusy` 文案,不发送请求
+
+#### Scenario: onToolCall 处理 client-side tools 执行
+
+- **WHEN** 服务端流式返回 `tool-call` part(state: `input-available`),LLM 调用了 `insertBlock`/`updateBlock`/`deleteBlock`/`replaceBlocks`/`moveBlock`/`getDocumentSnapshot` 之一
+- **THEN** `useChat` 的 `onToolCall({ toolCall: { toolName, toolCallId, input } })` SHALL 触发
+- **THEN** 回调 SHALL 根据 `toolName` 分发到 `executeClientTool(toolName, input)` 实现(调用 `editor.insertBlocks/updateBlock/removeBlocks`)
+- **WHEN** execute 成功
+- **THEN** 系统 SHALL 调用 `addToolOutput({ tool: toolName, toolCallId, output: result })` 注入 tool result(state: `output-available`)
+- **THEN** `sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls` SHALL 自动触发下一轮请求把 tool result 提交给模型
+- **WHEN** execute 失败(revision 冲突或前置条件冲突)
+- **THEN** 系统 SHALL 调用 `addToolOutput({ tool: toolName, toolCallId, state: 'output-error', errorText })` 报告错误
+- **THEN** tool-call part state SHALL 转为 `output-error`,UI 显示冲突气泡
+- **THEN** 系统 SHALL NOT 在 `onToolCall` 内 `await addToolOutput`(避免死锁)
 
 #### Scenario: 流式渲染 text 与 tool part
 
 - **WHEN** 服务端返回 UIMessageStream
 - **THEN** hook SHALL 增量更新 `messages` 状态
 - **THEN** `text` part SHALL 渲染为 AI 文本气泡(左对齐,流式光标 `◌`)
-- **THEN** `tool-call` part SHALL 渲染为输入中状态(`◔/◑/◐` 旋转图标 + toolName + 目标块 ID),嵌入同一条 assistant 消息气泡内
+- **THEN** `tool-call` part SHALL 根据状态渲染:`input-streaming` 显示 `◔/◑/◐` 输入中动画;`input-available` 显示等待 execute;`output-available` 显示成功 `✓` + 独立结果气泡;`output-error` 显示 `⚠`/`✗` + 重试按钮
 
 #### Scenario: 中止当前轮
 
 - **WHEN** 用户在流式中点击中止按钮
 - **THEN** 系统 SHALL 调用 `abort()` 中断流式请求
-- **THEN** 已成功的 tool-call 结果 SHALL 保留,不被回退
+- **THEN** 已成功的 tool-call 结果 SHALL 保留(state: `output-available`),不被回退
 - **THEN** 系统 SHALL 调用 `busy.release()`,输入框恢复可用
 
 #### Scenario: 完成或失败释放 busy
@@ -83,37 +96,38 @@
 
 ### Requirement: 提供客户端 tools execute
 
-系统 SHALL 提供客户端 tools 实现,与服务端 `ChatToolSet` schema 同源(从 ai-core 导入 `blockOperationSchema`,不在 ai-chat 包重新定义)。tools 列表:`insertBlock`/`updateBlock`/`deleteBlock`/`replaceBlocks`/`moveBlock`/`getDocumentSnapshot`。每个 `execute(args, { toolCallId })` SHALL 先校验 `args.baseDocumentRevision` 与目标块前置条件,冲突返回 ai-core `ConflictResult`;成功调用 `editor.insertBlocks/updateBlock/removeBlocks` 作用于编辑器。
+系统 SHALL 提供 `executeClientTool(toolName, input, ctx)` 函数实现 client-side tools 执行,由 `useTapNoteChat` 的 `onToolCall` 回调调用。支持 6 个 tool:`insertBlock`/`updateBlock`/`deleteBlock`/`replaceBlocks`/`moveBlock`/`getDocumentSnapshot`。每个执行 SHALL 先校验 `input.baseDocumentRevision` 与目标块前置条件,冲突返回 ai-core `ConflictResult`(可重试);成功调用 `editor.insertBlocks/updateBlock/removeBlocks` 作用于编辑器。与服务端 `ChatToolSet` schema 同源(从 ai-core 导入 `blockOperationSchema`,不在 ai-chat 重新定义)。
 
 #### Scenario: insertBlock 成功
 
-- **WHEN** LLM 返回 `tool-call: insertBlock, args: { block, referenceBlockId, baseDocumentRevision }`
+- **WHEN** `onToolCall` 收到 `toolCall: { toolName: "insertBlock", toolCallId, input: { block, referenceBlockId, baseDocumentRevision } }`
 - **WHEN** `baseDocumentRevision` 与当前文档 revision 一致且 `referenceBlockId` 存在
-- **THEN** `execute` SHALL 调用 `editor.insertBlocks([block], referenceBlockId, "after")`
-- **THEN** `execute` SHALL 返回 `{ ok: true }` 作为 tool result,按 `toolCallId` 回传进入后续消息
+- **THEN** `executeClientTool` SHALL 调用 `editor.insertBlocks([block], referenceBlockId, "after")`
+- **THEN** 系统 SHALL 调用 `addToolOutput({ tool: "insertBlock", toolCallId, output: { ok: true } })`,state 转为 `output-available`
+- **THEN** `sendAutomaticallyWhen` SHALL 自动触发下一轮请求把 tool result 提交给模型
 
 #### Scenario: revision 冲突返回 ConflictResult
 
-- **WHEN** `execute` 校验 `baseDocumentRevision` 与当前文档 revision 不一致
-- **THEN** `execute` SHALL 不调用 editor API,不修改文档
-- **THEN** `execute` SHALL 返回 ai-core `ConflictResult`(`reason: "revision-mismatch"`,携带当前 revision)
-- **THEN** tool 结果气泡 SHALL 显示 `⚠` + `AICoreDictionary.conflict` 文案 + 「仅重试该操作」按钮
+- **WHEN** `executeClientTool` 校验 `input.baseDocumentRevision` 与当前文档 revision 不一致
+- **THEN** 系统 SHALL NOT 调用 editor API,不修改文档
+- **THEN** 系统 SHALL 调用 `addToolOutput({ tool: toolName, toolCallId, state: 'output-error', errorText })` 报告冲突
+- **THEN** tool-call part state SHALL 转为 `output-error`,tool 结果气泡 SHALL 显示 `⚠` + `AICoreDictionary.conflict` 文案 + 「仅重试该操作」按钮
 
 #### Scenario: 前置条件冲突返回 ConflictResult
 
-- **WHEN** `execute` 校验 `targetBlockId` 不存在(已被删除)
-- **THEN** `execute` SHALL 不调用 editor API,不修改文档
-- **THEN** `execute` SHALL 返回 `ConflictResult`(`reason: "precondition-failed"`)
+- **WHEN** `executeClientTool` 校验 `input.targetBlockId` 不存在(已被删除)
+- **THEN** 系统 SHALL NOT 调用 editor API,不修改文档
+- **THEN** 系统 SHALL 调用 `addToolOutput({ tool: toolName, toolCallId, state: 'output-error', errorText })` 报告前置失败
 - **THEN** tool 结果气泡 SHALL 显示 `⚠` + `AICoreDictionary.preconditionFailed` 文案 + 「仅重试该操作」按钮
 
-#### Scenario: getDocumentSnapshot 仅在引用全文时暴露
+#### Scenario: getDocumentSnapshot 仅在引用全文时由服务端声明
 
 - **WHEN** 上下文模式为 `none`
-- **THEN** clientTools SHALL 不包含 `getDocumentSnapshot`,LLM 无法调用
+- **THEN** 客户端 `sendMessage` SHALL 在 body 中传 `contextMode: "none"`,服务端 SHALL NOT 在 `streamText` 的 `tools` 中声明 `getDocumentSnapshot`,LLM 无法调用
 - **WHEN** 上下文模式为 `selection`
-- **THEN** clientTools SHALL 不包含 `getDocumentSnapshot`
+- **THEN** 服务端 SHALL NOT 声明 `getDocumentSnapshot`
 - **WHEN** 上下文模式为 `full` 且集成方 `allowSnapshotTool: true`(默认)
-- **THEN** clientTools SHALL 包含 `getDocumentSnapshot`,但 `execute` 内 SHALL 受 `maxBlocks`(默认 10)与 `maxTokens`(默认 2K)约束,超额返回截断结果
+- **THEN** 服务端 SHALL 声明 `getDocumentSnapshot`,客户端 `onToolCall` 收到调用时 `executeClientTool` SHALL 受 `maxBlocks`(默认 10)与 `maxTokens`(默认 2K)约束,返回截断后的快照
 
 ### Requirement: 提供 `ToolResultBubble` 工具结果气泡
 
@@ -238,6 +252,31 @@
 - **WHEN** 系统在 chat 上下文使用 `aiBusy`/`conflict`/`preconditionFailed`/`selectionBlocked`/`documentTruncated`/`outlineMode` 等字段
 - **THEN** 字段值 SHALL 来自 ai-core `aiCoreDictionaryZhCN` 或集成方覆盖
 - **THEN** ai-chat 包 SHALL NOT 重新定义这些字段
+
+### Requirement: 服务端声明 6 个 client-side tools 与客户端 execute 对齐
+
+系统 SHALL 在 `apps/server-api/src/modules/ai/services/chat.ts` 中替换 FEAT-005 留下的 stub `chatClientSideTools`(单 `applyDocumentOperations` 工具 + `z.object({ operation: z.string() })` 占位 schema)为 6 个正式 client-side tools 声明:`insertBlock`/`updateBlock`/`deleteBlock`/`replaceBlocks`/`moveBlock`/`getDocumentSnapshot`。每个 inputSchema SHALL 从 ai-core `blockOperationSchema` 派生(单 source of truth,不在服务端重新定义)。服务端 SHALL 只声明 inputSchema,不提供 `execute`(由客户端执行)。
+
+#### Scenario: 服务端声明 6 个 tools 不 execute
+
+- **WHEN** 客户端发送 `POST /api/ai/chat` 请求
+- **THEN** 服务端 `streamText` 调用 SHALL 包含 6 个 tools 声明(`insertBlock`/`updateBlock`/`deleteBlock`/`replaceBlocks`/`moveBlock`/`getDocumentSnapshot`)
+- **THEN** 每个 tool 声明 SHALL 含 `description` 与 `inputSchema`,SHALL NOT 含 `execute` 函数
+- **THEN** LLM 返回的 `tool-call` chunks SHALL 转发给客户端,服务端不执行任何 editor 操作
+
+#### Scenario: 客户端按 contextMode 动态暴露 getDocumentSnapshot
+
+- **WHEN** 上下文模式为 `none` 或 `selection`
+- **THEN** 客户端 `useChat` 的 `tools` 选项 SHALL NOT 包含 `getDocumentSnapshot`,LLM 不可见该 tool
+- **WHEN** 上下文模式为 `full` 且 `allowSnapshotTool: true`(默认)
+- **THEN** 客户端 `useChat` 的 `tools` 选项 SHALL 包含 `getDocumentSnapshot` 与对应 `execute`
+- **THEN** 服务端总是声明 6 个 tools(避免动态 schema 增减导致 LLM 混淆),客户端按 contextMode 决定实际暴露给 LLM 的子集
+
+#### Scenario: tool schema 与 ai-core 同源
+
+- **WHEN** 检查 `chatClientSideTools` 的 `inputSchema`
+- **THEN** 每个 tool 的 inputSchema SHALL 从 ai-core `blockOperationSchema` 派生(组合或扩展),SHALL NOT 在服务端独立定义等价 schema
+- **THEN** 客户端 tools 的 inputSchema(同 name)SHALL 与服务端声明一致(单 source of truth)
 
 ### Requirement: 发布包授权干净
 

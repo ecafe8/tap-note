@@ -1,56 +1,56 @@
-import { TapNoteEditor } from "@tap-note/editor"
-import type { Block } from "@tap-note/editor"
-import { Button } from "@workspace/ui/components/button"
-import { useEffect, useState, useSyncExternalStore } from "react"
-import { useTheme } from "@/components/theme-provider.tsx"
-import { createAIBusyState, createServerTransport } from "@tap-note/ai-core"
-import { createTapNoteInlineAssistant } from "@tap-note/ai-inline"
-import type { AIInlineStoreState } from "@tap-note/ai-inline"
+import { BrowserRouter, Routes, Route, NavLink, useNavigate } from 'react-router-dom'
+import { TapNoteEditor } from '@tap-note/editor'
+import type { Block } from '@tap-note/editor'
+import { Button } from '@workspace/ui/components/button'
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useTheme } from '@/components/theme-provider.tsx'
+import { createAIBusyState, createServerTransport } from '@tap-note/ai-core'
+import { createTapNoteInlineAssistant } from '@tap-note/ai-inline'
+import type { AIInlineStoreState } from '@tap-note/ai-inline'
+import { createTapNoteChatAssistant } from '@tap-note/ai-chat'
+import { Sidemenu } from '@/components/sidemenu'
+import { EditorPaperLayout } from '@/components/editor-paper-layout'
+import { ChatDrawer } from '@/components/chat-drawer'
+import { ModelSelector } from '@/components/model-selector'
 
-import "./app.css"
+import './app.css'
 
 const INITIAL_CONTENT = [
-  { type: "paragraph", content: "Hello tap-note editor." },
-  { type: "paragraph", content: "试试 / 唤起 slash 菜单,或拖拽块、缩进、切换格式。" },
-  { type: "paragraph", content: "点击上方「✨ AI 助手」按钮体验内联 AI(需启动 server-api)。" },
+  { type: 'paragraph', content: 'Hello tap-note editor.' },
+  { type: 'paragraph', content: '试试 / 唤起 slash 菜单,或拖拽块、缩进、切换格式。' },
+  { type: 'paragraph', content: '点击上方「✨ AI 助手」按钮体验内联 AI(需启动 server-api)。' },
 ] as const
 
 const aiBusyState = createAIBusyState()
 
-function createInlineAssistant() {
-  return createTapNoteInlineAssistant({
-    transport: createServerTransport({
-      baseUrl: "/api/ai/editor/streamText",
-      model: "dashscope:qwen-plus",
-    }),
-    aiBusyState,
-  })
-}
+const inlineAssistant = createTapNoteInlineAssistant({
+  transport: createServerTransport({
+    baseUrl: '/api/ai/editor/streamText',
+    model: 'dashscope:qwen-plus',
+  }),
+  aiBusyState,
+})
 
-const inlineAssistant = createInlineAssistant()
-const aiContext = inlineAssistant.context!
+const chatAssistant = createTapNoteChatAssistant({
+  transport: createServerTransport({
+    baseUrl: '/api/ai/chat',
+    model: 'dashscope:qwen-plus',
+  }),
+  aiBusyState,
+})
 
-function useAIInlineState(): AIInlineStoreState {
-  const store = aiContext.store
-  return useSyncExternalStore(
-    (cb: () => void) => store.subscribe(cb as never),
-    () => store.state,
-    () => store.state,
-  )
-}
-
-type ResolvedTheme = "light" | "dark"
+type ResolvedTheme = 'light' | 'dark'
 
 function useResolvedTheme(): ResolvedTheme {
   const [resolved, setResolved] = useState<ResolvedTheme>(() =>
-    typeof document !== "undefined" && document.documentElement.classList.contains("dark")
-      ? "dark" : "light",
+    typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+      ? 'dark' : 'light',
   )
   useEffect(() => {
-    const update = () => setResolved(document.documentElement.classList.contains("dark") ? "dark" : "light")
+    const update = () => setResolved(document.documentElement.classList.contains('dark') ? 'dark' : 'light')
     update()
     const observer = new MutationObserver(update)
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
     return () => observer.disconnect()
   }, [])
   return resolved
@@ -58,61 +58,82 @@ function useResolvedTheme(): ResolvedTheme {
 
 function ThemeToggleButton() {
   const { theme, setTheme } = useTheme()
-  const next = theme === "dark" ? "light" : theme === "light" ? "dark" : "light"
+  const next = theme === 'dark' ? 'light' : theme === 'light' ? 'dark' : 'light'
   return <Button variant="outline" size="sm" onClick={() => setTheme(next)}>切换主题({theme})</Button>
+}
+
+function useAIInlineState(): AIInlineStoreState {
+  const ctx = inlineAssistant.context!
+  const store = ctx.store
+  return useSyncExternalStore(
+    (cb: () => void) => store.subscribe(cb as never),
+    () => store.state,
+    () => store.state,
+  )
 }
 
 function AIMenuPanel({ onClose }: { onClose: () => void }) {
   const aiState = useAIInlineState()
-  const [input, setInput] = useState("")
+  const [input, setInput] = useState('')
   const state = aiState.state
+  const ctx = inlineAssistant.context!
 
   const handleSubmit = () => {
     if (!input.trim()) return
-    console.log("[AIMenu] submit:", input.trim())
-    aiContext.submit(input.trim())
-    setInput("")
+    ctx.submit(input.trim())
+    setInput('')
   }
 
-  if (state.status === "user-input") {
+  if (state.status === 'user-input') {
     return (
-      <div style={{ position: "fixed", bottom: "2rem", left: "50%", transform: "translateX(-50%)", display: "flex", gap: "0.5rem", alignItems: "center", padding: "0.5rem 0.75rem", background: "var(--background)", border: "1px solid var(--border)", borderRadius: "0.5rem", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 1000 }}>
-        <input type="text" value={input} onChange={(e) => setInput(e.target.value)}
+      <div className="tn-demo-ai-menu" role="form">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && input.trim()) { e.preventDefault(); handleSubmit() }
-            if (e.key === "Escape") { onClose(); setInput("") }
+            if (e.key === 'Enter' && !e.shiftKey && input.trim()) {
+              e.preventDefault()
+              handleSubmit()
+            }
+            if (e.key === 'Escape') {
+              onClose()
+              setInput('')
+            }
           }}
-          placeholder="输入指令,如「续写一段」..." style={{ width: "300px", border: "none", outline: "none", background: "transparent" }} autoFocus />
+          placeholder="输入指令,如「续写一段」..."
+          autoFocus
+        />
         <Button size="sm" onClick={handleSubmit}>发送</Button>
-        <Button size="sm" variant="ghost" onClick={onClose}>✕</Button>
+        <Button size="sm" variant="ghost" onClick={() => { onClose(); setInput('') }}>✕</Button>
       </div>
     )
   }
 
-  if (state.status === "thinking" || state.status === "ai-writing") {
+  if (state.status === 'thinking' || state.status === 'ai-writing') {
     return (
-      <div style={{ position: "fixed", bottom: "2rem", left: "50%", transform: "translateX(-50%)", display: "flex", gap: "0.5rem", alignItems: "center", padding: "0.5rem 0.75rem", background: "var(--background)", border: "1px solid var(--border)", borderRadius: "0.5rem", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 1000 }}>
-        <span>AI 正在{state.status === "thinking" ? "思考" : "写作"}...</span>
-        <Button size="sm" variant="destructive" onClick={() => aiContext.abort()}>中止</Button>
+      <div className="tn-demo-ai-menu" role="status">
+        <span>AI 正在{state.status === 'thinking' ? '思考' : '写作'}...</span>
+        <Button size="sm" variant="destructive" onClick={() => ctx.abort()}>中止</Button>
       </div>
     )
   }
 
-  if (state.status === "user-reviewing") {
+  if (state.status === 'user-reviewing') {
     return (
-      <div style={{ position: "fixed", bottom: "2rem", left: "50%", transform: "translateX(-50%)", display: "flex", gap: "0.5rem", alignItems: "center", padding: "0.5rem 0.75rem", background: "var(--background)", border: "1px solid var(--border)", borderRadius: "0.5rem", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 1000 }}>
+      <div className="tn-demo-ai-menu" role="dialog">
         <span>AI 完成,请审阅</span>
-        <Button size="sm" onClick={() => { aiContext.accept(); onClose() }}>接受</Button>
-        <Button size="sm" variant="outline" onClick={() => { aiContext.reject(); onClose() }}>拒绝</Button>
+        <Button size="sm" onClick={() => { ctx.accept(); onClose() }}>接受</Button>
+        <Button size="sm" variant="outline" onClick={() => { ctx.reject(); onClose() }}>拒绝</Button>
       </div>
     )
   }
 
-  if (state.status === "error") {
+  if (state.status === 'error') {
     return (
-      <div style={{ position: "fixed", bottom: "2rem", left: "50%", transform: "translateX(-50%)", display: "flex", gap: "0.5rem", alignItems: "center", padding: "0.5rem 0.75rem", background: "var(--background)", border: "1px solid var(--destructive)", borderRadius: "0.5rem", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 1000 }}>
-        <span style={{ color: "var(--destructive)" }}>{state.error}</span>
-        <Button size="sm" onClick={() => aiContext.retry()}>重试</Button>
+      <div className="tn-demo-ai-menu" role="alert">
+        <span style={{ color: 'var(--destructive)' }}>{state.error}</span>
+        <Button size="sm" onClick={() => ctx.retry()}>重试</Button>
         <Button size="sm" variant="ghost" onClick={onClose}>关闭</Button>
       </div>
     )
@@ -121,36 +142,43 @@ function AIMenuPanel({ onClose }: { onClose: () => void }) {
   return null
 }
 
-export function App() {
+interface EditorPaneProps {
+  /** 是否显示 inline AI 浮层。 */
+  showInline?: boolean
+  /** 编辑器操作栏右侧附加内容(如对话抽屉开关)。 */
+  actions?: ReactNode
+}
+
+function EditorPane({ showInline, actions }: EditorPaneProps) {
   const [blocks, setBlocks] = useState<Block[] | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const resolvedTheme = useResolvedTheme()
 
   const handleClose = () => {
-    aiContext.close()
+    inlineAssistant.context!.close()
     setMenuOpen(false)
   }
 
   return (
-    <div className="tap-note-app">
-      <header className="tap-note-app-header">
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          <h1 style={{ fontSize: "1rem", fontWeight: 500, margin: 0 }}>tap-note editor 冒烟</h1>
-          <span style={{ color: "var(--muted-foreground)", fontSize: "0.875rem" }}>BlockNote · {resolvedTheme}</span>
+    <div className="tn-demo-editor-pane">
+      <header className="tn-demo-editor-header">
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {showInline ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setMenuOpen(true)}
+              disabled={aiBusyState.isBusy && !inlineAssistant.context!.store.state.state ? false : aiBusyState.isBusy}
+            >
+              ✨ AI 助手
+            </Button>
+          ) : null}
+          {actions}
           <Button size="sm" onClick={() => console.log(blocks)}>打印 blocks</Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setMenuOpen(true)
-            }}
-          >
-            ✨ AI 助手
-          </Button>
-          <ThemeToggleButton />
+          <span style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>BlockNote · {resolvedTheme}</span>
         </div>
       </header>
-      <main className="tap-note-app-editor">
+      <main className="tn-demo-editor-main">
         <TapNoteEditor
           theme={resolvedTheme}
           initialContent={[...INITIAL_CONTENT]}
@@ -159,7 +187,108 @@ export function App() {
           aiBusyState={aiBusyState}
         />
       </main>
-      {menuOpen && <AIMenuPanel onClose={handleClose} />}
+      {showInline && menuOpen ? <AIMenuPanel onClose={handleClose} /> : null}
     </div>
   )
 }
+
+function ModelAndThemeBar() {
+  const [model, setModel] = useState('dashscope:qwen-plus')
+  return (
+    <div className="tn-demo-toolbar">
+      <ModelSelector value={model} onChange={setModel} />
+      <ThemeToggleButton />
+    </div>
+  )
+}
+
+function InlineRoute() {
+  return (
+    <EditorPaperLayout>
+      <ModelAndThemeBar />
+      <EditorPane showInline />
+    </EditorPaperLayout>
+  )
+}
+
+function ChatRoute() {
+  return (
+    <EditorPaperLayout>
+      <ModelAndThemeBar />
+      <EditorPane
+        actions={
+          <ChatDrawer>
+            {chatAssistant.panel ? <chatAssistant.panel /> : null}
+          </ChatDrawer>
+        }
+      />
+    </EditorPaperLayout>
+  )
+}
+
+function BothRoute() {
+  return (
+    <EditorPaperLayout>
+      <ModelAndThemeBar />
+      <EditorPane
+        showInline
+        actions={
+          <ChatDrawer>
+            {chatAssistant.panel ? <chatAssistant.panel /> : null}
+          </ChatDrawer>
+        }
+      />
+    </EditorPaperLayout>
+  )
+}
+
+function HeaderBar() {
+  return (
+    <header className="tn-demo-header">
+      <h1 className="tn-demo-title">tap-note demo</h1>
+    </header>
+  )
+}
+
+export function App() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    // 默认重定向到 /inline(根路径访问时)
+    if (window.location.pathname === '/') {
+      navigate('/inline', { replace: true })
+    }
+  }, [navigate])
+
+  return (
+    <div className="tn-demo-app">
+      <HeaderBar />
+      <div className="tn-demo-body">
+        <Sidemenu
+          items={[
+            { to: '/inline', label: '内联助手', icon: '✨' },
+            { to: '/chat', label: '对话助手', icon: '💬' },
+            { to: '/both', label: '并存(互斥)', icon: '🔀' },
+          ]}
+        />
+        <div className="tn-demo-content">
+          <Routes>
+            <Route path="/inline" element={<InlineRoute />} />
+            <Route path="/chat" element={<ChatRoute />} />
+            <Route path="/both" element={<BothRoute />} />
+            <Route path="/" element={<InlineRoute />} />
+          </Routes>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function AppRoot() {
+  return (
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  )
+}
+
+void NavLink

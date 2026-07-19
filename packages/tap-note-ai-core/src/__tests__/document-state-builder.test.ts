@@ -35,8 +35,8 @@ describe('createDocumentStateBuilder', () => {
     const builder = createDocumentStateBuilder(editor, { scope: 'full' })
     const state = builder.build()
     expect(state.blocks.length).toBe(3)
-    expect((state.blocks[0] as { id?: string }).id).toBe('block-1')
-    expect((state.blocks[2] as { id?: string }).id).toBe('block-3')
+    expect((state.blocks[0] as { id?: string }).id).toBe('block-1$')
+    expect((state.blocks[2] as { id?: string }).id).toBe('block-3$')
     builder.dispose()
   })
 
@@ -62,8 +62,8 @@ describe('createDocumentStateBuilder', () => {
     const state = builder.build()
     expect(state.blocks.length).toBeGreaterThanOrEqual(1)
     expect(state.selection).toBeDefined()
-    expect(state.selection?.start).toBe('block-1')
-    expect(state.selection?.end).toBe('block-2')
+    expect(state.selection?.start).toBe('block-1$')
+    expect(state.selection?.end).toBe('block-2$')
     builder.dispose()
   })
 

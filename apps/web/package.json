@@ -12,13 +12,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ai-sdk/react": "4.0.34",
+    "@tap-note/ai-chat": "workspace:*",
     "@tap-note/ai-core": "workspace:*",
     "@tap-note/ai-inline": "workspace:*",
     "@tap-note/editor": "workspace:*",
     "@workspace/ui": "workspace:*",
+    "ai": "7.0.31",
     "lucide-react": "^1.24.0",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "react-router-dom": "^7.18.1"
   },
   "devDependencies": {
     "@eslint/js": "^10",

@@ -119,6 +119,7 @@ function suggestOperationsToEditor(
 
   // 构建事务,转换为建议事务,dispatch
   let dispatched = false
+  let dispatchError: unknown
   editor.exec((state, dispatch) => {
     if (!dispatch) {
       console.warn('[ai-core] editor.exec has no dispatch')
@@ -127,8 +128,11 @@ function suggestOperationsToEditor(
     const tr = state.tr
     try {
       applyOperationsToTransaction(tr, editor, operations)
-    } catch {
-      // 步骤应用失败(如目标块不存在),不 dispatch
+    } catch (err) {
+      // 步骤应用失败(如目标块不存在、block schema 不合法),不 dispatch
+      // 记录详细异常供诊断,上层据此返回 ConflictResult
+      dispatchError = err
+      console.error('[ai-core] applyOperationsToTransaction threw:', err)
       return false
     }
     const suggestionTr = transformToSuggestionTransaction(tr, state)
@@ -141,6 +145,16 @@ function suggestOperationsToEditor(
     return true
   })
   if (!dispatched) {
+    if (dispatchError !== undefined) {
+      // 步骤应用失败,返回 precondition-failed ConflictResult,避免上层误认为成功
+      return {
+        kind: 'conflict',
+        reason: 'precondition-failed',
+        currentDocumentRevision: currentDocumentRevision ?? 0,
+        operation: operations[0]!,
+        message: `apply operations failed: ${dispatchError instanceof Error ? dispatchError.message : String(dispatchError)}`,
+      }
+    }
     console.warn('[ai-core] no suggestion transaction dispatched')
   }
   return
@@ -151,9 +165,9 @@ function checkPreconditions(
   operations: BlockOperation[],
 ): ConflictResult | undefined {
   for (const op of operations) {
-    const missing = collectTargetIds(op).filter(
-      (id) => !getNodeById(id, editor.prosemirrorState.doc),
-    )
+    const missing = collectTargetIds(op)
+      .map(stripIdSuffix)
+      .filter((id) => !getNodeById(id, editor.prosemirrorState.doc))
     if (missing.length > 0) {
       return {
         kind: 'conflict',
@@ -182,6 +196,17 @@ function collectTargetIds(op: BlockOperation): string[] {
   }
 }
 
+/**
+ * 剥掉 `DocumentStateBuilder` 给 block id 加的 `$` 后缀。
+ *
+ * - 真实块 ID 在发送给 LLM 前被加了 `$` 后缀(参见 `document-state-builder.ts` 的 `suffixBlockIds`),
+ *   LLM 回传的 `referenceBlockId`/`targetBlockId` 会带 `$`,这里在 lookup 前透明剥掉。
+ * - 若 id 不带 `$`(如直接调用 `applyOperationsToEditor` 的测试/老路径),原样返回,保持向后兼容。
+ */
+function stripIdSuffix(id: string): string {
+  return id.endsWith('$') ? id.slice(0, -1) : id
+}
+
 function applyOperationsToTransaction(
   tr: Transaction,
   editor: BlockNoteEditor,
@@ -199,39 +224,47 @@ function applyOperationToTransaction(
 ): void {
   switch (op.type) {
     case 'insertBlock':
+      validateBlockForEditor(op.block, editor)
       insertBlocks(
         tr,
         [op.block] as PartialBlock[],
-        op.referenceBlockId ?? getFirstBlockId(editor),
+        op.referenceBlockId
+          ? stripIdSuffix(op.referenceBlockId)
+          : getFirstBlockId(editor),
         op.position,
       )
       return
     case 'updateBlock':
-      updateBlock(tr, op.targetBlockId, op.block as PartialBlock)
+      validateBlockForEditor(op.block, editor)
+      updateBlock(tr, stripIdSuffix(op.targetBlockId), op.block as PartialBlock)
       return
     case 'deleteBlock':
-      removeAndInsertBlocks(tr, [op.targetBlockId], [])
+      removeAndInsertBlocks(tr, [stripIdSuffix(op.targetBlockId)], [])
       return
     case 'replaceBlocks':
+      for (const b of op.blocks) {
+        validateBlockForEditor(b, editor)
+      }
       removeAndInsertBlocks(
         tr,
-        op.targetBlockIds,
+        op.targetBlockIds.map(stripIdSuffix),
         op.blocks as PartialBlock[],
       )
       return
     case 'moveBlock': {
       // BlockNote 没有直接 moveBlockTo(reference, position) API,
       // 用 getNodeById + nodeToBlock 复制块内容,然后 remove + insert 到新位置
-      const targetInfo = getNodeById(op.targetBlockId, tr.doc)
+      const strippedTargetId = stripIdSuffix(op.targetBlockId)
+      const targetInfo = getNodeById(strippedTargetId, tr.doc)
       if (!targetInfo) {
-        throw new Error(`moveBlock: target block ${op.targetBlockId} not found`)
+        throw new Error(`moveBlock: target block ${strippedTargetId} not found`)
       }
       const pmSchema = editor.prosemirrorState.schema
       const movedBlock = nodeToBlock(targetInfo.node, pmSchema) as PartialBlock
       // 删除原位置
-      removeAndInsertBlocks(tr, [op.targetBlockId], [])
+      removeAndInsertBlocks(tr, [strippedTargetId], [])
       // 在新位置插入(保留原 ID)
-      insertBlocks(tr, [movedBlock], op.referenceBlockId, op.position)
+      insertBlocks(tr, [movedBlock], stripIdSuffix(op.referenceBlockId), op.position)
       return
     }
   }
@@ -243,4 +276,26 @@ function getFirstBlockId(editor: BlockNoteEditor): string {
     throw new Error('editor document is empty, cannot insert without referenceBlockId')
   }
   return firstBlock.id
+}
+
+/**
+ * 校验 `block.type`(若提供)在当前 editor 的 ProseMirror schema 中存在,
+ * 不存在则抛清晰错误(而不是让 `blockToNode` 内部抛 `Cannot read properties of undefined`)。
+ *
+ * BlockNote 默认 schema 包含的 block types:paragraph / heading / quote / divider /
+ * image / audio / video / file / table。LLM 若生成 `"type": "text"` / `"type": "h1"`
+ * 等非法值,会在此被拦截,异常消息含合法 block types 列表,便于上层(LLM)修正。
+ */
+function validateBlockForEditor(block: { type?: string }, editor: BlockNoteEditor): void {
+  if (!block.type) {
+    // type 缺省 → blockToNode 内部 fallback 到 paragraph,合法
+    return
+  }
+  const nodes = editor.prosemirrorState.schema.nodes
+  if (!nodes[block.type]) {
+    const validTypes = Object.keys(nodes).filter((n) => nodes[n]?.isInGroup?.('blockContent')).join(', ')
+    throw new Error(
+      `block type "${block.type}" not found in editor schema. Valid block types: ${validTypes || '(none)'}`,
+    )
+  }
 }

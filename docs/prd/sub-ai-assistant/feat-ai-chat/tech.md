@@ -178,3 +178,140 @@ function createTapNoteChatAssistant(options: {
 - 是否支持批量操作（总 PRD §17 item 11，当前严格单操作）。
 - token 估算算法待确认（总 PRD §17 item 13）。
 - `needsApproval` 审批开关为 P2 候选，当前不实现（总 PRD §5.2）。
+
+## 14. 研究闸门结论（FEAT-004 add-ai-chat T-1.1–1.7 完成）
+
+本节为 OpenSpec change `add-ai-chat` 任务 1.1–1.7 的可复核结论。研究阶段完成后锁定以下事实，后续实现严格基于此。**重大订正**:FEAT-002 ai-core tech.md §14.4 已记录 v7 client-side tools 的真实模式(`onToolCall` + `addToolOutput`,非 `tools: { execute }`),本 change 原 design.md Decision 2/11 假设有误,已在 design.md 修订。
+
+### 14.1 锁定版本组合(复用 FEAT-002 §14.1)
+
+| 包 | 版本 | 授权 | 备注 |
+|---|---|---|---|
+| `ai` | `7.0.31` | Apache-2.0 | FEAT-002 已锁定,本 change 复用 |
+| `@ai-sdk/react` | `7.0.x` | Apache-2.0 | peerDep `ai@7.0.x`,提供 `useChat` |
+| `@ai-sdk/alibaba` | `2.0.14` | Apache-2.0 | FEAT-005 已在 server-api 引入 |
+| `@ai-sdk/google` | `4.0.18` | Apache-2.0 | FEAT-005 已在 server-api 引入(可选) |
+| `@blocknote/core` | `0.51.4` | MPL-2.0 | FEAT-001 已引入 |
+| `@blocknote/react` | `0.51.4` | MPL-2.0 | FEAT-001 已引入 |
+| `@tap-note/ai-core` | workspace | 自有 | 复用 schema/builder/busy/transport/layerContext |
+| `zod` | 与 monorepo 一致 | MIT | peerDep `^3.25.76 || ^4.1.8` |
+| `react` / `react-dom` | `^19` | MIT | peerDep |
+
+### 14.2 `useChat` hook v7 精确 API(T-1.1 / 1.2 / 1.3)
+
+通过 Context7 `/websites/ai-sdk_dev` 查询与复用 FEAT-002 §14.2 结论:
+
+- **`useChat(options)`** 返回 `{ messages, input, setInput, sendMessage, abort, status, addToolOutput, ... }`
+- **`sendMessage(message, { body, headers })`** 支持 per-call 动态 body 与 headers:
+  - `body` 字段会被合并到 HTTP request body,服务端通过 `await req.json()` 读取
+  - 用于 per-request 注入 `documentState`、`documentRevision`、`model`、`contextMode`(动态字段)
+  - 不依赖 transport 的 static body,transport 只配置 `api`、静态 `headers`、`credentials`
+- **`transport: new DefaultChatTransport({ api, headers, body, credentials })`**:静态配置,创建时设置 `api: "/api/ai/chat"`、可选 `headers`(如 `Authorization` 由集成方 `getAuthHeaders` 注入)
+- **`messages: UIMessage[]`**:`UIMessage = { id, role, parts: Part[] }`,`content` 属性在 v5+ 已移除,统一用 `parts` 数组
+- **`Part` 类型**:
+  - `{ type: "text", text }` — 文本 part
+  - `{ type: "reasoning", text }` — 推理 part
+  - `{ type: "tool-call", toolCallId, toolName, input, state }` — 工具调用 part(`state: "input-streaming" | "input-available" | "output-available" | "output-error"`)
+  - `{ type: "tool-result", toolCallId, toolName, output, state }` — 工具结果 part
+  - `{ type: "data-*", ... }` — 自定义数据 part
+- **`status`**:`"ready" | "submitted" | "streaming" | "ready" | "error"` 等;`"submitted"` 表示已发送等待响应,`"streaming"` 表示流式接收中
+- **`abort()`**:中断当前流式请求,保留已收到 messages 与已成功 tool-call 结果
+
+### 14.3 client-side tools `onToolCall` + `addToolOutput` 模式(T-1.2 关键订正)
+
+通过 Context7 `/websites/ai-sdk_dev` 查询确认(参考 https://ai-sdk.dev/docs/ai-sdk-ui/chatbot-tool-usage 与 https://ai-sdk.dev/docs/troubleshooting/tool-invocation-missing-result):
+
+v7 `useChat` 的 client-side tools **不使用 `tools: { toolName: { execute } }` 模式**(原 design.md Decision 2 假设有误),而是用以下模式:
+
+```tsx
+const { messages, sendMessage, addToolOutput } = useChat({
+  transport: new DefaultChatTransport({ api: '/api/ai/chat' }),
+  // 自动提交 tool result 给模型,触发下一轮
+  sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+  // 处理 client-side tool 调用
+  onToolCall: async ({ toolCall }) => {
+    const { toolName, toolCallId, input } = toolCall
+    try {
+      const result = await executeClientTool(toolName, input) // 调用 editor API
+      // 关键:不能 await addToolOutput,否则死锁
+      addToolOutput({ tool: toolName, toolCallId, output: result })
+    } catch (err) {
+      addToolOutput({
+        tool: toolName,
+        toolCallId,
+        state: 'output-error',
+        errorText: err instanceof Error ? err.message : String(err),
+      })
+    }
+  },
+})
+```
+
+关键约束:
+- **不能在 `onToolCall` 内 `await addToolOutput`**,否则死锁
+- `sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls`(来自 `ai` 包)自动触发下一轮请求,把 tool result 提交给模型
+- `addToolOutput({ tool, toolCallId, output })` 把 tool result 注入到对应 `toolCallId` 的 tool-call part,state 转为 `output-available`
+- `addToolOutput({ tool, toolCallId, state: 'output-error', errorText })` 报告错误,state 转为 `output-error`
+- 服务端 `streamText` 的 `tools` 选项声明 schema(只含 `description` + `inputSchema`,不含 `execute`);客户端 `useChat` 不重复声明 schema,只通过 `onToolCall` 处理执行
+
+**对本 change 的影响**:
+- `useTapNoteChat` hook 不接收 `clientTools` 选项,改为接收 `onToolCall` 回调的实现(`executeClientTool(toolName, input)`)
+- 冲突重试「仅重试该 toolCallId」:重新调用 `executeClientTool(toolName, input)` + 用最新 revision,成功后调 `addToolOutput` 更新该 toolCallId 的 output
+- `getDocumentSnapshot` 可见性:服务端在 `streamText` 调用前根据请求 body 的 `contextMode` 过滤 tools 声明(`none`/`selection` 模式不声明 `getDocumentSnapshot`),客户端 `onToolCall` 只需处理 5 个核心 tools + 在 `full` 模式下处理 `getDocumentSnapshot`
+
+### 14.4 `UIMessage.parts` 渲染(T-1.3)
+
+通过 Context7 与 FEAT-002 §14.2/14.4 确认:
+
+- partial tool-call input 通过 `tool-input-start` → `tool-input-delta`(JSON delta 字符串)→ `tool-input-end` → `tool-call`(最终完整 input)chunks 增量到达
+- 客户端 `useChat` 自动累积 partial,UI 渲染时:
+  - `state: "input-streaming"` — 显示 `◔/◑/◐` 输入中动画
+  - `state: "input-available"` — 输入完整,等待 execute
+  - `state: "output-available"` — execute 成功,显示 `✓` + 结果气泡
+  - `state: "output-error"` — execute 失败,显示 `⚠` 或 `✗` + 重试按钮
+- 工具结果气泡独立于 UIMessage.parts 渲染(在 AI 消息气泡下方独立组件),通过 `toolCallId` 关联
+
+### 14.5 provider peerDep 兼容性(T-1.4,复用 FEAT-002 §14.5)
+
+- `ai@7.0.31` peerDep:`zod: ^3.25.76 || ^4.1.8`
+- `@ai-sdk/alibaba@2.0.14` peerDep:`zod: ^3.25.76 || ^4.1.8`
+- `@ai-sdk/google@4.0.18` peerDep:`zod: ^3.25.76 || ^4.1.8`
+- 三者共享 `@ai-sdk/provider@4.0.3` + `@ai-sdk/provider-utils@5.0.11`,peerDep 完全一致,可安全锁定组合
+
+### 14.6 xl-ai client-side tools 重写要点(T-1.5,复用 FEAT-002 §14.3)
+
+通过阅读 `resource/BlockNote/packages/xl-ai/src/streamTool/vercelAiSdk/` 源码:
+
+- xl-ai v6 已使用 v7 形状的 UIMessage parts(`{ type: "text", text }`),无需翻译
+- v6 `ClientSideTransport implements ChatTransport<UI_MESSAGE>` 的 `sendMessages` + `reconnectToStream` 模式与 v7 `ChatTransport` 接口同形状
+- v6 的 `injectDocumentStateMessages` 把 documentState 注入为一条 `assistant` 消息携带多个 `text` parts,紧贴在原 user 消息之前 — FEAT-002 已实现并复用
+- v6 `ToolLoopAgent` 在 v7 保留,`needsApproval` 已废弃改 `toolApproval` — 不影响本 change(对话助手不用 Agent)
+
+### 14.7 研究闸门放行结论(T-1.7)
+
+T-1.1–1.7 全部有可复核结果(已写入 14.1–14.6),无需进一步研究。**关键修订**:
+- 原 design.md Decision 2 假设 `tools: { execute }` 模式 — **订正为 `onToolCall` + `addToolOutput` 模式**(详见 14.3)
+- 原 design.md Decision 11 假设客户端 useChat 的 `tools` 选项动态暴露 getDocumentSnapshot — **订正为服务端按请求 body `contextMode` 过滤 tools 声明**
+
+design.md、specs/ai-chat/spec.md、tasks.md 已同步修订。后续实现严格基于此。
+
+### 14.8 依赖闭包与许可证检查(FEAT-004 收尾)
+
+通过 `bun pm ls --all` 扫描 `@tap-note/ai-chat` 的依赖闭包,确认:
+
+| 依赖 | 版本 | 授权 | 来源 |
+|---|---|---|---|
+| `@blocknote/core` | 0.51.4 | MPL-2.0 | `apps/server-api`/`packages/tap-note-editor` 间接引入 |
+| `@blocknote/react` | 0.51.4 | MPL-2.0 | 同上 |
+| `@ai-sdk/react` | 4.0.34 | Apache-2.0 | `packages/tap-note-ai-chat` peerDep+devDep |
+| `ai` | 7.0.31 | Apache-2.0 | 间接引入(provider 共享) |
+| `@ai-sdk/alibaba` | 2.0.14 | Apache-2.0 | 间接引入(可选) |
+| `@ai-sdk/google` | 4.0.18 | Apache-2.0 | 间接引入(可选) |
+| `@tap-note/ai-core` | workspace | 自有 | workspace:* |
+| `zod` | 与 monorepo 一致 | MIT | peerDep |
+| `react` / `react-dom` | ^19 | MIT | peerDep |
+
+**禁止依赖扫描结论**:
+- 闭包不含 `@blocknote/xl-ai`、`@blocknote/xl-ai-server`、`@blocknote/xl-pdf-exporter`、`@blocknote/xl-docx-exporter`、`@blocknote/xl-multi-column`
+- 闭包不含任何 GPL-3.0、AGPL-3.0 或专有许可证依赖
+- 满足总 PRD §10 授权规则,可继续推进到 archive

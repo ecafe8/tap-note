@@ -156,7 +156,7 @@ export function createAIInlineExtension(options: CreateTapNoteInlineAssistantOpt
       await processToolCallStream(
         stream,
         (operations: BlockOperation[]) => {
-          console.log('[ai-inline] received operations:', JSON.stringify(operations.map((op: BlockOperation) => ({ type: op.type, targetBlockId: 'targetBlockId' in op ? op.targetBlockId : undefined, referenceBlockId: 'referenceBlockId' in op ? op.referenceBlockId : undefined }))))
+          console.log('[ai-inline] received operations:', JSON.stringify(operations, null, 2))
           if (firstToolCall) {
             firstToolCall = false
             dispatch({ type: 'first-tool-call', operations })

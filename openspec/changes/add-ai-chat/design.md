@@ -43,16 +43,23 @@ FEAT-002 ai-core 已归档,提供 `BlockOperation`/`DocumentState`/`ConflictResu
 
 备选:在 ai-chat 包内同时导出 `<ChatDrawer>` 包装组件(含开关/位置/动画)。放弃原因是会绑定特定布局模式,违反"位置无关"目标;集成方布局需求多样(右侧抽屉/左侧/浮动/独立路由),由集成方应用层实现更灵活。
 
-### 2. 用 AI SDK v7 `useChat` hook 而非 `Chat` 类
+### 2. 用 AI SDK v7 `useChat` hook + `onToolCall` + `addToolOutput` 模式
 
-对话助手用 `@ai-sdk/react` v7 的 `useChat` hook 管理与服务端的通信,而非内联使用的 `Chat` 类:
-- `useChat` 绑定 React state,适合在 React 组件(`TapNoteChatPanel`)内使用,自动管理 messages 状态、流式 chunk 增量、tool-call 状态
-- `useChat` 的 `transport` 选项接收 ai-core `createServerTransport` 创建的 `DefaultChatTransport` 实例
-- per-request 的 `documentState` 通过 `sendMessage(message, { body: { documentState, documentRevision } })` 动态注入到请求 body
-- client-side tools 通过 `useChat` 的 `tools` 选项传入,`execute` 在浏览器内调用 `editor.insertBlocks/updateBlock/removeBlocks`
+对话助手用 `@ai-sdk/react` v7 的 `useChat` hook 管理与服务端的通信,**不使用 `tools: { execute }` 模式**(原 v6 形式已废弃),改用 v7 标准的 `onToolCall` + `addToolOutput` 模式(详见 feat-ai-chat/tech.md §14.3):
+- `useChat({ transport, sendAutomaticallyWhen, onToolCall })` 创建 chat 上下文
+- `transport` 接收 ai-core `createServerTransport` 创建的 `DefaultChatTransport` 实例(静态配置 `api`/`headers`)
+- per-request 的 `documentState`/`documentRevision`/`contextMode`/`model` 通过 `sendMessage(message, { body: {...} })` 动态注入(详见 feat-ai-chat/tech.md §14.2)
+- `sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls`(来自 `ai` 包)自动触发 tool result 提交
+- `onToolCall({ toolCall: { toolName, toolCallId, input } })` 回调处理 client-side tools 执行:
+  - 根据 `toolName` 分发到对应 `executeClientTool(toolName, input)` 实现(调用 `editor.insertBlocks/updateBlock/removeBlocks`)
+  - 成功调 `addToolOutput({ tool, toolCallId, output: result })` 注入 tool result
+  - 失败调 `addToolOutput({ tool, toolCallId, state: 'output-error', errorText })`
+  - **关键约束**:不能在 `onToolCall` 内 `await addToolOutput`,否则死锁
 
-备选 A:用 `Chat` 类(与内联一致)。放弃原因是 `Chat` 类不绑定 React state,需要手动同步 messages 到 React state 渲染,增加复杂度。
-备选 B:直接用 `fetch` + 手动 SSE 解析。放弃原因是 v7 UIMessage stream 协议解析复杂,`useChat` 已内置且类型安全。
+备选 A:用 `tools: { execute }` 模式。**已通过 Context7 排除**:v7 不再支持此模式,v6 的 `maxSteps` 已移除,改用 `stopWhen` + `sendAutomaticallyWhen` + `onToolCall`/`addToolOutput`。
+备选 B:用 `Chat` 类(与内联一致)。放弃原因是 `Chat` 类不绑定 React state,需要手动同步 messages 到 React state 渲染,增加复杂度。
+备选 C:直接用 `fetch` + 手动 SSE 解析。放弃原因是 v7 UIMessage stream 协议解析复杂,`useChat` 已内置且类型安全。
+
 
 ### 3. 工具结果气泡独立于 UIMessage.parts 渲染
 
@@ -119,6 +126,23 @@ demo 引入 `react-router-dom` 实现 `/inline`、`/chat`、`/both` 三路由 + 
 
 备选 A:用简单状态切换(无 router)。放弃原因是 URL 不可分享、刷新丢路由、不符合 demo "可分享可二次开发" 定位。
 备选 B:用 TanStack Router。放弃原因是引入成本高,React Router 已满足 demo 需求。
+
+### 11. server-api `chat.ts` 替换 stub 为 6 个 client-side tools 声明
+
+FEAT-005 archived 实现的 `apps/server-api/src/modules/ai/services/chat.ts` 中 `chatClientSideTools` 是 stub:单 `applyDocumentOperations` 工具 + `z.object({ operation: z.string() })` 占位 schema。本 change 替换为 6 个正式 client-side tools 声明(`insertBlock`/`updateBlock`/`deleteBlock`/`replaceBlocks`/`moveBlock`/`getDocumentSnapshot`),每个 inputSchema 从 ai-core `blockOperationSchema` 派生(单 source of truth,不在服务端重新定义)。服务端只声明 inputSchema 不 execute;客户端按 tool name 实现 execute。
+
+工具 schema 派生方式:
+- `insertBlock`: `z.object({ block: blockSchema, referenceBlockId: z.string(), baseDocumentRevision: z.number() })`
+- `updateBlock`: `z.object({ targetBlockId: z.string(), block: blockSchema, baseDocumentRevision: z.number() })`
+- `deleteBlock`: `z.object({ targetBlockId: z.string(), baseDocumentRevision: z.number() })`
+- `replaceBlocks`: `z.object({ targetBlockIds: z.array(z.string()), blocks: z.array(blockSchema), baseDocumentRevision: z.number() })`
+- `moveBlock`: `z.object({ targetBlockId: z.string(), referenceBlockId: z.string(), position: z.enum(["before", "after"]), baseDocumentRevision: z.number() })`
+- `getDocumentSnapshot`: `z.object({ fromBlock: z.string().optional(), maxBlocks: z.number().optional(), maxTokens: z.number().optional() })`
+
+`getDocumentSnapshot` 的可见性由**服务端**按请求 body 的 `contextMode` 动态过滤:`none`/`selection` 模式不声明该 tool(LLM 不可见),`full` 模式声明该 tool。客户端 `sendMessage(message, { body: { contextMode, ... } })` 把当前 contextMode 传给服务端,服务端 `streamText` 调用前根据 contextMode 过滤 tools 声明。客户端 `onToolCall` 只需处理实际会收到的 tools。
+
+备选 A:服务端总是声明 6 个 tools,客户端 `onToolCall` 在 `none`/`selection` 模式拒绝 `getDocumentSnapshot`。放弃原因是 LLM 仍会看到该 tool 并可能调用,造成无意义重试。
+备选 B:客户端 `useChat` 的 `tools` 选项按 contextMode 暴露子集。**已通过 Context7 排除**:v7 `useChat` 没有 `tools` 选项(客户端不声明 schema,只通过 `onToolCall` 处理执行);LLM 看到的 tools 完全由服务端 `streamText` 的 `tools` 选项决定。
 
 ## Risks / Trade-offs
 

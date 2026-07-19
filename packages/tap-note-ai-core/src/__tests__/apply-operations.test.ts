@@ -246,6 +246,60 @@ describe('applyOperationsToEditor', () => {
     expect(result).toBeUndefined()
   })
 
+  test('带 $ 后缀的 referenceBlockId/targetBlockId 被透明剥后缀 lookup', () => {
+    // 模拟 LLM 回传的 operations:documentStateBuilder 给 id 加了 $ 后缀,
+    // LLM 复制带 $ 的 id,applyOperationsToEditor 在 lookup 前剥 $
+    const ops: BlockOperation[] = [
+      {
+        type: 'insertBlock',
+        baseDocumentRevision: 0,
+        referenceBlockId: 'block-2$',
+        position: 'after',
+        block: { type: 'paragraph', content: 'suffixed-insert' },
+      },
+    ]
+    applyOperationsToEditor(editor, ops, { mode: 'suggest' })
+    applyOperationsToEditor(editor, [], { mode: 'apply' })
+    const doc = editor.document
+    const inserted = doc.find((b) => getBlockText(b) === 'suffixed-insert')
+    expect(inserted).toBeDefined()
+  })
+
+  test('带 $ 后缀的 targetBlockId update 正确命中', () => {
+    const ops: BlockOperation[] = [
+      {
+        type: 'updateBlock',
+        baseDocumentRevision: 0,
+        targetBlockId: 'block-1$',
+        block: { type: 'paragraph', content: 'updated-via-suffix' },
+      },
+    ]
+    applyOperationsToEditor(editor, ops, { mode: 'suggest' })
+    applyOperationsToEditor(editor, [], { mode: 'apply' })
+    const doc = editor.document
+    const found = findBlockWithText(doc, 'updated-via-suffix')
+    expect(found).toBeDefined()
+  })
+
+  test('applyOperationsToTransaction 抛异常时返回 precondition-failed ConflictResult', () => {
+    // 用一个非法 content(触发 blockToNode / node.check 抛)验证 catch 不再静默吞
+    const ops: BlockOperation[] = [
+      {
+        type: 'updateBlock',
+        baseDocumentRevision: 0,
+        targetBlockId: 'block-1$',
+        // block.type 不在 schema 中 → blockToNode 抛 "node type xxx not found in schema"
+        block: { type: '__nonexistent_block_type__', content: 'bad' },
+      } as unknown as BlockOperation,
+    ]
+    const result = applyOperationsToEditor(editor, ops, { mode: 'suggest' })
+    expect(result).toBeDefined()
+    const conflict = result as ConflictResult
+    expect(conflict.kind).toBe('conflict')
+    expect(conflict.reason).toBe('precondition-failed')
+    expect(conflict.message).toContain('apply operations failed')
+  })
+
   test('流式期间手动编辑后 revert 不覆盖人工编辑', () => {
     // Step 1: AI suggest 在 block-2 上更新
     const aiOps: BlockOperation[] = [
