@@ -9,21 +9,23 @@ import { z } from 'zod'
  * JWT 配置为可选:未配置时跳过 JWT 校验(开发/演示模式)。
  * 生产环境集成方自行配置 JWT 鉴权。
  */
+const emptyToUndefined = (v: unknown) => (v === '' ? undefined : v)
+
 const envSchema = z.object({
   /** DashScope(阿里云百炼)API Key,必填。 */
   DASHSCOPE_API_KEY: z.string().min(1, 'DASHSCOPE_API_KEY is required'),
   /** DashScope 自定义 base URL(可选)。 */
-  DASHSCOPE_BASE_URL: z.string().url().optional(),
+  DASHSCOPE_BASE_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
   /** Google Generative AI API Key(可选,未设置则不返回 google:* 模型)。 */
-  GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1).optional(),
+  GOOGLE_GENERATIVE_AI_API_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
   /** Google 自定义 base URL。 */
-  GOOGLE_GENERATIVE_BASE_URL: z.string().url().optional(),
+  GOOGLE_GENERATIVE_BASE_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
   /** JWT 签发者(可选,未配置时跳过 JWT 校验)。 */
-  JWT_ISSUER: z.string().optional(),
+  JWT_ISSUER: z.preprocess(emptyToUndefined, z.string().optional()),
   /** JWT 受众(可选)。 */
-  JWT_AUDIENCE: z.string().optional(),
+  JWT_AUDIENCE: z.preprocess(emptyToUndefined, z.string().optional()),
   /** JWT 验证密钥(可选,PEM 公钥或共享密钥)。 */
-  JWT_VERIFY_KEY: z.string().optional(),
+  JWT_VERIFY_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   /** JWT 允许的签名算法(逗号分隔)。默认 `RS256,ES256`。 */
   JWT_ALGORITHMS: z.string().default('RS256,ES256'),
   /** 监听端口。默认 3000。 */
