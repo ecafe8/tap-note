@@ -6,6 +6,7 @@ import type {
   AIBusyState,
   DocumentState,
   DocumentStateBuilder,
+  SelectionTracker,
   Transport,
 } from '@tap-note/ai-core'
 import type { UIMessage } from 'ai'
@@ -39,6 +40,8 @@ export interface UseTapNoteChatOptions {
   contextMode: ContextMode
   /** 上下文模式更新回调。 */
   onContextModeChange?: (mode: ContextMode) => void
+  /** 选区跟踪器(可选)。selection 模式发送时读取其快照,避免失焦丢选区。 */
+  selectionTracker?: SelectionTracker
 }
 
 /**
@@ -99,6 +102,7 @@ export function useTapNoteChat(options: UseTapNoteChatOptions): UseTapNoteChatRe
     allowSnapshotTool = true,
     contextMode,
     onContextModeChange,
+    selectionTracker,
   } = options
 
   const [contextModeState, setContextModeState] = useState<ContextMode>(contextMode)
@@ -187,7 +191,9 @@ export function useTapNoteChat(options: UseTapNoteChatOptions): UseTapNoteChatRe
 
       let documentState: DocumentState | undefined
       try {
-        documentState = buildDocumentState(editor, contextModeState, documentStateBuilder)
+        // selection 模式优先用选区快照(失焦后实时选区丢失时仍可用)。
+        const snapshot = selectionTracker?.getSnapshot()
+        documentState = buildDocumentState(editor, contextModeState, documentStateBuilder, snapshot)
       } catch {
         documentState = undefined
       }
@@ -206,7 +212,7 @@ export function useTapNoteChat(options: UseTapNoteChatOptions): UseTapNoteChatRe
         },
       )
     },
-    [aiBusyState, editor, contextModeState, documentStateBuilder, model, getAuthHeaders, chat],
+    [aiBusyState, editor, contextModeState, documentStateBuilder, model, getAuthHeaders, chat, selectionTracker],
   )
 
   const abort = useCallback(() => {

@@ -113,4 +113,85 @@ describe('InputArea', () => {
     expect(input.disabled).toBe(true)
     expect(screen.getByText(`⏸ ${chatDictionaryZhCN.chatBusy}`)).toBeDefined()
   })
+
+  test('selection 模式有选区时渲染 chip 与块数量', () => {
+    render(
+      <InputArea
+        value=""
+        onChange={() => {}}
+        onSubmit={() => {}}
+        onAbort={() => {}}
+        dictionary={chatDictionaryZhCN}
+        isStreaming={false}
+        isBusy={false}
+        busyReason={null}
+        selectionChipBlockCount={3}
+        selectionModeActive={true}
+        onClearSelection={() => {}}
+      />,
+    )
+    expect(screen.getByText('📍 已选 3 个块')).toBeDefined()
+    expect(screen.queryByText(chatDictionaryZhCN.selectionEmptyHint)).toBeNull()
+  })
+
+  test('点击 chip ✕ 触发 onClearSelection', () => {
+    let cleared = false
+    render(
+      <InputArea
+        value=""
+        onChange={() => {}}
+        onSubmit={() => {}}
+        onAbort={() => {}}
+        dictionary={chatDictionaryZhCN}
+        isStreaming={false}
+        isBusy={false}
+        busyReason={null}
+        selectionChipBlockCount={2}
+        selectionModeActive={true}
+        onClearSelection={() => { cleared = true }}
+      />,
+    )
+    fireEvent.click(screen.getByLabelText(chatDictionaryZhCN.clearSelection))
+    expect(cleared).toBe(true)
+  })
+
+  test('selection 模式无选区时显示提示而非 chip', () => {
+    render(
+      <InputArea
+        value=""
+        onChange={() => {}}
+        onSubmit={() => {}}
+        onAbort={() => {}}
+        dictionary={chatDictionaryZhCN}
+        isStreaming={false}
+        isBusy={false}
+        busyReason={null}
+        selectionChipBlockCount={undefined}
+        selectionModeActive={true}
+        onClearSelection={() => {}}
+      />,
+    )
+    expect(screen.getByText(chatDictionaryZhCN.selectionEmptyHint)).toBeDefined()
+    expect(screen.queryByLabelText(chatDictionaryZhCN.clearSelection)).toBeNull()
+  })
+
+  test('非 selection 模式不渲染 chip 与提示', () => {
+    render(
+      <InputArea
+        value=""
+        onChange={() => {}}
+        onSubmit={() => {}}
+        onAbort={() => {}}
+        dictionary={chatDictionaryZhCN}
+        isStreaming={false}
+        isBusy={false}
+        busyReason={null}
+        selectionChipBlockCount={undefined}
+        selectionModeActive={false}
+        onClearSelection={() => {}}
+      />,
+    )
+    expect(screen.queryByText(chatDictionaryZhCN.selectionEmptyHint)).toBeNull()
+    expect(screen.queryByLabelText(chatDictionaryZhCN.clearSelection)).toBeNull()
+  })
 })

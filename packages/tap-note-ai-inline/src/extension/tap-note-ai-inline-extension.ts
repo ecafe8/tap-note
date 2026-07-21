@@ -1,8 +1,8 @@
 import { createExtension, type BlockNoteEditor } from '@blocknote/core'
 import { suggestChanges } from '@handlewithcare/prosemirror-suggest-changes'
 import { createStore } from '@blocknote/core'
-import type { Transport, DocumentStateBuilder, AIBusyState, BlockOperation, ConflictResult } from '@tap-note/ai-core'
-import { applyOperationsToEditor, layerContext, createDocumentStateBuilder } from '@tap-note/ai-core'
+import type { Transport, DocumentStateBuilder, AIBusyState, BlockOperation, ConflictResult, SelectionTracker } from '@tap-note/ai-core'
+import { applyOperationsToEditor, layerContext, createDocumentStateBuilder, createSelectionTracker } from '@tap-note/ai-core'
 import type { InlineState, InlineEvent } from './state-machine'
 import { transition } from './state-machine'
 import { processToolCallStream } from '../stream-tool-executor'
@@ -84,6 +84,7 @@ export function createAIInlineExtension(options: CreateTapNoteInlineAssistantOpt
   const modelId = options.model ?? 'dashscope:qwen-plus'
 
   let editorRef: BlockNoteEditor | undefined
+  let selectionTrackerRef: SelectionTracker | undefined
 
   const store = createStore<AIInlineStoreState>({
     state: { status: 'user-input' },
@@ -120,10 +121,14 @@ export function createAIInlineExtension(options: CreateTapNoteInlineAssistantOpt
 
     try {
       // 构建 documentState
-      // AIMenu 输入框会让编辑器失焦。每次提交都从当前 editor 创建 full 快照，
+      // AIMenu 输入框会让编辑器失焦。每次提交都从当前 editor 创建快照，
       // 避免复用旧的 cursor/affected builder 或 BlockNote 的虚拟尾随空块。
+      // 选区感知:有选区快照(失焦后保留)发选区,否则回退全文。
+      const snapshot = selectionTrackerRef?.getSnapshot()
       const currentBuilder = createDocumentStateBuilder(editorRef, { scope: 'full' })
-      const documentState = currentBuilder.build()
+      const documentState = snapshot
+        ? currentBuilder.build({ scope: 'selection', selection: snapshot })
+        : currentBuilder.build()
       // 冻结 revision:之后任何 editor.onChange 都不应影响本次操作的冲突检测
       const frozenRevision = currentBuilder.documentRevision
       console.log('[ai-inline] documentState blocks:', JSON.stringify(documentState.blocks.map((b: { id?: string }) => ({ id: b.id }))))
@@ -313,6 +318,10 @@ export function createAIInlineExtension(options: CreateTapNoteInlineAssistantOpt
       prosemirrorPlugins: [suggestChanges()],
       mount: () => {
         editorRef = editor
+        // 选区跟踪:失焦后保留最后非空选区,供 submit 选区感知。
+        if (!selectionTrackerRef) {
+          selectionTrackerRef = createSelectionTracker(editor)
+        }
         // 监听编辑器文本变化,检测 /ai 输入
         unsubscribe = editor.onChange(() => {
           const pos = editor.getTextCursorPosition()
@@ -334,6 +343,8 @@ export function createAIInlineExtension(options: CreateTapNoteInlineAssistantOpt
       },
       onDestroy: () => {
         unsubscribe?.()
+        selectionTrackerRef?.dispose()
+        selectionTrackerRef = undefined
       },
     }
   })

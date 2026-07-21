@@ -44,6 +44,12 @@ export interface TapNoteChatPanelProps {
   toolResultBubbles?: ReactNode
   /** 自定义 ToolResultBubble 组件(供 demo/集成方覆盖)。 */
   ToolResultBubbleComponent?: FC<ToolResultBubbleProps>
+  /** selection 模式下已捕获选区的块数量(undefined 表示无选区或非 selection 模式)。 */
+  selectionChipBlockCount?: number
+  /** 是否处于 selection 模式(无选区时据此显示提示)。 */
+  selectionModeActive?: boolean
+  /** 清除已捕获选区(chip ✕ 按钮)。 */
+  onClearSelection?: () => void
 }
 
 /**
@@ -74,6 +80,9 @@ export const TapNoteChatPanel: FC<TapNoteChatPanelProps> = ({
   onClose,
   inputRef,
   toolResultBubbles,
+  selectionChipBlockCount,
+  selectionModeActive,
+  onClearSelection,
 }) => {
   const empty = (
     <div className="tn-chat-empty" role="status">
@@ -129,6 +138,9 @@ export const TapNoteChatPanel: FC<TapNoteChatPanelProps> = ({
         isBusy={isBusy}
         busyReason={busyReason}
         inputRef={inputRef}
+        selectionChipBlockCount={selectionChipBlockCount}
+        selectionModeActive={selectionModeActive}
+        onClearSelection={onClearSelection}
       />
     </section>
   )

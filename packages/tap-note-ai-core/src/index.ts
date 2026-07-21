@@ -32,7 +32,20 @@ export type {
   DocumentStateScope,
   /** `createDocumentStateBuilder` 选项。 */
   CreateDocumentStateBuilderOptions,
+  /** `build()` 调用选项(scope 覆盖 + 选区快照)。 */
+  BuildOptions,
 } from './document-state-builder'
+
+/** 创建 `SelectionTracker`,持续跟踪编辑器最后非空选区,失焦后保留(避免点输入框丢选区)。 */
+export {
+  createSelectionTracker,
+} from './selection-tracker'
+export type {
+  /** `SelectionTracker` 实例接口,提供 `getSnapshot()`/`clear()`/`subscribe()`/`dispose()`。 */
+  SelectionTracker,
+  /** 选区快照:最后非空选区的块范围与起止块 ID。 */
+  SelectionSnapshot,
+} from './selection-tracker'
 
 /** 把 `documentState` 注入到 `messages` 列表,适配 AI SDK v7 `UIMessage.parts` 数组结构。 */
 export {

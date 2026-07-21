@@ -4,6 +4,7 @@ import {
   documentStateSchema,
 } from './types/schema'
 import type { DocumentState } from './types/type'
+import type { SelectionSnapshot } from './selection-tracker'
 
 /**
  * 文档状态序列化范围。
@@ -12,6 +13,18 @@ import type { DocumentState } from './types/type'
  * - `"affected"`:内联自动取受影响块(光标所在块)
  */
 export type DocumentStateScope = 'selection' | 'full' | 'affected'
+
+/**
+ * `build()` 调用选项。
+ *
+ * - `scope`:覆盖创建时的默认 scope(对话助手按 contextMode 动态切换 selection/full)。
+ * - `selection`:选区快照(来自 `SelectionTracker`)。编辑器失焦后实时 `getSelection()`
+ *   可能拿不到选区,传入快照可保证「点输入框即丢选区」时仍按用户选区构建。
+ */
+export interface BuildOptions {
+  scope?: DocumentStateScope
+  selection?: SelectionSnapshot
+}
 
 /**
  * `DocumentStateBuilder` 选项。
@@ -46,8 +59,11 @@ export interface DocumentStateBuilder {
   /**
    * 序列化当前编辑器受影响块或选区范围为 `DocumentState`。
    * 非法 editor 状态或空文档兜底返回空 `DocumentState`(空 blocks + revision 0)。
+   *
+   * @param options 可选 `BuildOptions`:`scope` 覆盖创建时默认范围;`selection`
+   *   传入选区快照(失焦后实时选区丢失时仍按用户选区构建)。
    */
-  build(): DocumentState
+  build(options?: BuildOptions): DocumentState
   /** 销毁订阅,释放资源。 */
   dispose(): void
 }
@@ -82,24 +98,36 @@ export function createDocumentStateBuilder(
     documentRevision += 1
   })
 
-  function resolveBlocks(): { blocks: PartialBlock[]; selection?: { start: string; end: string } } {
+  function resolveSelectionBlocks(
+    blocks: PartialBlock[],
+  ): { blocks: PartialBlock[]; selection?: { start: string; end: string } } {
+    const ids = blocks.map((b) => b.id).filter((id): id is string => typeof id === 'string')
+    if (ids.length >= 2) {
+      return { blocks: suffixBlockIds(blocks), selection: { start: `${ids[0]!}$`, end: `${ids[ids.length - 1]!}$` } }
+    }
+    if (ids.length === 1) {
+      return { blocks: suffixBlockIds(blocks), selection: { start: `${ids[0]!}$`, end: `${ids[0]!}$` } }
+    }
+    return { blocks: suffixBlockIds(blocks) }
+  }
+
+  function resolveBlocks(
+    effectiveScope: DocumentStateScope,
+    snapshot?: SelectionSnapshot,
+  ): { blocks: PartialBlock[]; selection?: { start: string; end: string } } {
     try {
-      if (scope === 'full') {
+      if (effectiveScope === 'full') {
         const blocks = collectAllBlocks(editor)
         return { blocks: suffixBlockIds(blocks) }
       }
-      if (scope === 'selection') {
+      if (effectiveScope === 'selection') {
+        // 优先用选区快照(失焦后实时选区丢失时仍可用),否则回退实时 getSelection()。
+        if (snapshot && snapshot.blocks.length > 0) {
+          return resolveSelectionBlocks(snapshot.blocks)
+        }
         const selection = editor.getSelection()
         if (selection && selection.blocks.length > 0) {
-          const blocks = selection.blocks as PartialBlock[]
-          const ids = blocks.map((b) => b.id).filter((id): id is string => typeof id === 'string')
-          if (ids.length >= 2) {
-            return { blocks: suffixBlockIds(blocks), selection: { start: `${ids[0]!}$`, end: `${ids[ids.length - 1]!}$` } }
-          }
-          if (ids.length === 1) {
-            return { blocks: suffixBlockIds(blocks), selection: { start: `${ids[0]!}$`, end: `${ids[0]!}$` } }
-          }
-          return { blocks: suffixBlockIds(blocks) }
+          return resolveSelectionBlocks(selection.blocks as PartialBlock[])
         }
         // 无显式选区,回退到 affected
       }
@@ -128,7 +156,7 @@ export function createDocumentStateBuilder(
     }
   }
 
-  function build(): DocumentState {
+  function build(options: BuildOptions = {}): DocumentState {
     if (disposed) {
       // 销毁后返回空 DocumentState,revision 0
       return documentStateSchema.parse({
@@ -138,7 +166,8 @@ export function createDocumentStateBuilder(
         blocks: [],
       }) as DocumentState
     }
-    const { blocks, selection } = resolveBlocks()
+    const effectiveScope = options.scope ?? scope
+    const { blocks, selection } = resolveBlocks(effectiveScope, options.selection)
     const state = documentStateSchema.parse({
       format: DOCUMENT_STATE_FORMAT,
       schemaVersion,

@@ -155,4 +155,55 @@ describe('createDocumentStateBuilder', () => {
     expect(onChangeMock).toHaveBeenCalledTimes(1)
     unsubscribe()
   })
+
+  test('build({ scope }) 覆盖创建时的默认 scope', () => {
+    // 创建时 scope=selection,但 build 传 full 应返回全部块
+    const builder = createDocumentStateBuilder(editor, { scope: 'selection' })
+    const state = builder.build({ scope: 'full' })
+    expect(state.blocks.length).toBe(3)
+    expect(state.selection).toBeUndefined()
+    builder.dispose()
+  })
+
+  test('build({ selection }) 用选区快照构建,即使实时选区已折叠', () => {
+    editor.setSelection('block-1', 'block-2')
+    const snapshot = {
+      blocks: [
+        { type: 'paragraph', id: 'block-1', content: 'first' },
+        { type: 'paragraph', id: 'block-2', content: 'second' },
+      ],
+      startBlockId: 'block-1',
+      endBlockId: 'block-2',
+      blockCount: 2,
+    }
+    // 折叠实时选区(模拟失焦/点输入框)
+    editor.setTextCursorPosition('block-3')
+    const builder = createDocumentStateBuilder(editor, { scope: 'selection' })
+    // 不传快照时应回退 affected(光标块 block-3)
+    const fallback = builder.build()
+    expect(fallback.selection).toBeUndefined()
+    // 传快照时按快照构建,携带 selection 范围
+    const state = builder.build({ selection: snapshot })
+    expect(state.blocks.length).toBe(2)
+    expect(state.selection?.start).toBe('block-1$')
+    expect(state.selection?.end).toBe('block-2$')
+    builder.dispose()
+  })
+
+  test('build({ scope: selection, selection }) 快照优先于实时选区', () => {
+    editor.setSelection('block-2', 'block-3')
+    const snapshot = {
+      blocks: [{ type: 'paragraph', id: 'block-1', content: 'first' }],
+      startBlockId: 'block-1',
+      endBlockId: 'block-1',
+      blockCount: 1,
+    }
+    const builder = createDocumentStateBuilder(editor, { scope: 'selection' })
+    const state = builder.build({ selection: snapshot })
+    expect(state.blocks.length).toBe(1)
+    expect((state.blocks[0] as { id?: string }).id).toBe('block-1$')
+    expect(state.selection?.start).toBe('block-1$')
+    expect(state.selection?.end).toBe('block-1$')
+    builder.dispose()
+  })
 })

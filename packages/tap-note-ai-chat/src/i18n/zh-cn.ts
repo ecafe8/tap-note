@@ -42,6 +42,12 @@ export interface ChatDictionary extends AICoreDictionary {
   jumpToBlock: string
   /** 工具结果气泡中的目标块标签。 */
   toolTarget: string
+  /** 选区 chip 文案(`{count}` 为块数量占位符)。 */
+  selectionChip: string
+  /** selection 模式但无选区时的提示文案。 */
+  selectionEmptyHint: string
+  /** 清除选区按钮 aria-label。 */
+  clearSelection: string
 }
 
 /**
@@ -79,6 +85,9 @@ export const chatDictionaryZhCN: ChatDictionary = {
   toolFailed: '操作失败',
   jumpToBlock: '跳转到该块',
   toolTarget: '目标',
+  selectionChip: '已选 {count} 个块',
+  selectionEmptyHint: '在编辑器中选中文字以引用选区',
+  clearSelection: '清除选区',
 }
 
 /**

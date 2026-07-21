@@ -5,6 +5,7 @@ import {
   type DocumentStateBuilder,
   type LayeredContext,
   type LayerContextOptions,
+  type SelectionSnapshot,
 } from '@tap-note/ai-core'
 import type { ContextMode } from './context-mode'
 
@@ -41,8 +42,9 @@ export function chatLayerContext(
 /**
  * 根据 `ContextMode` 构建 documentState。
  *
- * - `selection` — 用 `documentStateBuilder.build({ scope: 'selection' })` 取当前选区
- * - `full` — 用 `documentStateBuilder.build({ scope: 'full' })` 取全文
+ * - `selection` — `build({ scope: 'selection', selection })`,优先用选区快照
+ *   (失焦后实时选区丢失时仍按用户选区构建);无快照时回退实时选区→光标块
+ * - `full` — `build({ scope: 'full' })` 取全文
  * - `none` — 返回 `undefined`(不发送)
  *
  * 调用方应在 `sendMessage` 前调用此函数,把结果与 `documentRevision` 一起通过
@@ -52,10 +54,14 @@ export function buildDocumentState(
   _editor: BlockNoteEditor,
   mode: ContextMode,
   documentStateBuilder: DocumentStateBuilder,
+  selection?: SelectionSnapshot,
 ): DocumentState | undefined {
   if (mode === 'none') return undefined
-  // DocumentStateBuilder 已在创建时配置 scope,这里只调 build() 复用
-  return documentStateBuilder.build()
+  if (mode === 'full') {
+    return documentStateBuilder.build({ scope: 'full' })
+  }
+  // selection 模式:优先用选区快照(避免点输入框失焦丢选区),否则回退实时选区。
+  return documentStateBuilder.build({ scope: 'selection', selection })
 }
 
 /**

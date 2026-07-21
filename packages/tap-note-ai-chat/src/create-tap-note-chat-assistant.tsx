@@ -1,11 +1,12 @@
-import { useState, type FC } from 'react'
+import { useState, useSyncExternalStore, type FC } from 'react'
 import type { BlockNoteEditor } from '@blocknote/core'
 import type {
   AIBusyState,
   DocumentStateBuilder,
+  SelectionTracker,
   Transport,
 } from '@tap-note/ai-core'
-import { createDocumentStateBuilder } from '@tap-note/ai-core'
+import { createDocumentStateBuilder, createSelectionTracker } from '@tap-note/ai-core'
 import { TapNoteChatPanel } from './tap-note-chat-panel'
 import type { TapNoteChatPanelProps } from './tap-note-chat-panel'
 import { type ChatDictionary, mergeChatDictionary } from './i18n/zh-cn'
@@ -88,12 +89,14 @@ export function createTapNoteChatAssistant(
   // mount 时填充的内部状态(用 mutable ref-like 对象)
   let editorRef: BlockNoteEditor | undefined
   let documentStateBuilderRef: DocumentStateBuilder | undefined = options.documentStateBuilder
+  let selectionTrackerRef: SelectionTracker | undefined
   const aiBusyStateRef: AIBusyState | undefined = options.aiBusyState
 
   function ChatPanelComponent(props: ChatPanelProps) {
     const editor = editorRef
     const dsb = documentStateBuilderRef
     const busy = aiBusyStateRef
+    const tracker = selectionTrackerRef
 
     // 在 editor/dsb/busy 未就绪时(集成方未先 mount)渲染占位
     // 不调用任何 React hook,避免条件渲染 hook 的 lint 错误
@@ -110,6 +113,7 @@ export function createTapNoteChatAssistant(
         editor={editor}
         documentStateBuilder={dsb}
         aiBusyState={busy}
+        selectionTracker={tracker}
         onClose={props.onClose}
         toolResultBubbleComponent={props.toolResultBubbleComponent}
       />
@@ -120,14 +124,22 @@ export function createTapNoteChatAssistant(
     editor: BlockNoteEditor
     documentStateBuilder: DocumentStateBuilder
     aiBusyState: AIBusyState
+    selectionTracker?: SelectionTracker
     onClose?: () => void
     toolResultBubbleComponent?: typeof ToolResultBubble
   }) {
-    const { editor, documentStateBuilder: dsb, aiBusyState: busy, onClose, toolResultBubbleComponent } = props
+    const { editor, documentStateBuilder: dsb, aiBusyState: busy, selectionTracker, onClose, toolResultBubbleComponent } = props
     const [contextMode, setContextMode] = useState<ContextMode>(DEFAULT_CONTEXT_MODE)
 
+    // 选区快照(响应式):失焦后保留,用于 selection 模式构建与输入区 chip 展示。
+    const selectionSnapshot = useSyncExternalStore(
+      (cb) => (selectionTracker ? selectionTracker.subscribe(cb) : () => {}),
+      () => selectionTracker?.getSnapshot(),
+      () => selectionTracker?.getSnapshot(),
+    )
+
     // 计算 layeredContext 与提示(每次 render 重新计算,基于当前 documentState)
-    const documentState = buildDocumentState(editor, contextMode, dsb)
+    const documentState = buildDocumentState(editor, contextMode, dsb, selectionSnapshot)
     const layered = chatLayerContext(documentState, contextMode)
     const hintKey = getContextHintKey(layered)
     const truncatedMessage = layered.mode !== 'none' && layered.layered.kind === 'truncated'
@@ -150,6 +162,7 @@ export function createTapNoteChatAssistant(
       allowSnapshotTool,
       contextMode,
       onContextModeChange: setContextMode,
+      selectionTracker,
     })
 
     // 渲染消息列表(用户消息 + AI 消息)
@@ -226,6 +239,9 @@ export function createTapNoteChatAssistant(
         tokenInfo={tokenInfo}
         onClose={onClose}
         toolResultBubbles={toolResultBubbles}
+        selectionChipBlockCount={chat.contextMode === 'selection' && selectionSnapshot ? selectionSnapshot.blockCount : undefined}
+        selectionModeActive={chat.contextMode === 'selection'}
+        onClearSelection={() => selectionTracker?.clear()}
       />
     )
   }
@@ -236,6 +252,9 @@ export function createTapNoteChatAssistant(
       editorRef = editor
       if (!documentStateBuilderRef) {
         documentStateBuilderRef = createDocumentStateBuilder(editor, { scope: 'selection' })
+      }
+      if (!selectionTrackerRef) {
+        selectionTrackerRef = createSelectionTracker(editor)
       }
     },
     unmount: (editor: BlockNoteEditor) => {
@@ -254,7 +273,14 @@ export function createTapNoteChatAssistant(
       } catch {
         // editor 已销毁时忽略
       }
+      // 销毁选区跟踪器订阅
+      try {
+        selectionTrackerRef?.dispose()
+      } catch {
+        // editor 已销毁时忽略
+      }
       documentStateBuilderRef = undefined
+      selectionTrackerRef = undefined
       editorRef = undefined
     },
     panel: ChatPanelComponent,
