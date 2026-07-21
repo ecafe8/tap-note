@@ -145,11 +145,13 @@ function AIMenuPanel({ onClose }: { onClose: () => void }) {
 interface EditorPaneProps {
   /** 是否显示 inline AI 浮层。 */
   showInline?: boolean
+  /** 是否挂载 chat 助手到编辑器。 */
+  showChat?: boolean
   /** 编辑器操作栏右侧附加内容(如对话抽屉开关)。 */
   actions?: ReactNode
 }
 
-function EditorPane({ showInline, actions }: EditorPaneProps) {
+function EditorPane({ showInline, showChat, actions }: EditorPaneProps) {
   const [blocks, setBlocks] = useState<Block[] | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const resolvedTheme = useResolvedTheme()
@@ -184,6 +186,7 @@ function EditorPane({ showInline, actions }: EditorPaneProps) {
           initialContent={[...INITIAL_CONTENT]}
           onChange={setBlocks}
           inlineAssistant={inlineAssistant}
+          chatAssistant={showChat ? chatAssistant : undefined}
           aiBusyState={aiBusyState}
         />
       </main>
@@ -216,6 +219,7 @@ function ChatRoute() {
     <EditorPaperLayout>
       <ModelAndThemeBar />
       <EditorPane
+        showChat
         actions={
           <ChatDrawer>
             {chatAssistant.panel ? <chatAssistant.panel /> : null}
@@ -232,6 +236,7 @@ function BothRoute() {
       <ModelAndThemeBar />
       <EditorPane
         showInline
+        showChat
         actions={
           <ChatDrawer>
             {chatAssistant.panel ? <chatAssistant.panel /> : null}
