@@ -48,7 +48,7 @@ describe('POST /api/ai/editor/streamText', () => {
     const res = await app.request('/api/ai/editor/streamText', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'dashscope:qwen-plus' }),
+      body: JSON.stringify({ model: 'dashscope:qwen3.7-plus' }),
     })
     expect(res.status).toBe(422)
     const body = await res.json()
@@ -63,7 +63,7 @@ describe('POST /api/ai/editor/streamText', () => {
       body: JSON.stringify({
         messages: [{ id: 'u-1', role: 'user', parts: [{ type: 'text', text: 'hi' }] }],
         documentState: { format: 'blocks-json', schemaVersion: '0.51.4', documentRevision: 0, blocks: [] },
-        model: 'dashscope:qwen-plus',
+        model: 'dashscope:qwen3.7-plus',
         tools: { customTool: {} },
       }),
     })

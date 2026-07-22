@@ -103,7 +103,7 @@ describe('executeClientTool: insertBlock', () => {
       position: 'after',
       baseDocumentRevision: 5,
     }, ctx)
-    expect(result).toEqual({ ok: true, currentDocumentRevision: 5 })
+    expect(result).toEqual({ ok: true, toolName: 'insertBlock', currentDocumentRevision: 5, targetBlockId: 'b2' })
     expect(ctx.calls.find((c) => c.method === 'insertBlocks')).toBeDefined()
   })
 
@@ -140,7 +140,7 @@ describe('executeClientTool: updateBlock', () => {
       block: { type: 'paragraph', content: 'updated' },
       baseDocumentRevision: 3,
     }, ctx)
-    expect(result).toEqual({ ok: true, currentDocumentRevision: 3 })
+    expect(result).toEqual({ ok: true, toolName: 'updateBlock', currentDocumentRevision: 3, targetBlockId: 'b2' })
     expect(ctx.calls.find((c) => c.method === 'updateBlock')).toBeDefined()
   })
 
@@ -162,7 +162,7 @@ describe('executeClientTool: deleteBlock', () => {
       targetBlockId: 'b2',
       baseDocumentRevision: 1,
     }, ctx)
-    expect(result).toEqual({ ok: true, currentDocumentRevision: 1 })
+    expect(result).toEqual({ ok: true, toolName: 'deleteBlock', currentDocumentRevision: 1, targetBlockId: 'b2' })
     expect(ctx.calls.find((c) => c.method === 'removeBlocks')).toBeDefined()
   })
 })
@@ -175,7 +175,7 @@ describe('executeClientTool: replaceBlocks', () => {
       blocks: [{ type: 'paragraph', content: 'merged' }],
       baseDocumentRevision: 4,
     }, ctx)
-    expect(result).toEqual({ ok: true, currentDocumentRevision: 4 })
+    expect(result).toEqual({ ok: true, toolName: 'replaceBlocks', currentDocumentRevision: 4, targetBlockId: 'b1' })
     expect(ctx.calls.find((c) => c.method === 'replaceBlocks')).toBeDefined()
   })
 
@@ -199,7 +199,7 @@ describe('executeClientTool: moveBlock', () => {
       position: 'after',
       baseDocumentRevision: 2,
     }, ctx)
-    expect(result).toEqual({ ok: true, currentDocumentRevision: 2 })
+    expect(result).toEqual({ ok: true, toolName: 'moveBlock', currentDocumentRevision: 2, targetBlockId: 'b1' })
     // 应该调用 insertBlocks + removeBlocks
     expect(ctx.calls.find((c) => c.method === 'insertBlocks')).toBeDefined()
     expect(ctx.calls.find((c) => c.method === 'removeBlocks')).toBeDefined()

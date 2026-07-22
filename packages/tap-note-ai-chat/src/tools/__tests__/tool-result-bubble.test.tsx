@@ -58,6 +58,17 @@ describe('ToolResultBubble', () => {
       />,
     )
     expect(screen.getByText(chatDictionaryZhCN.toolDeleted)).toBeDefined()
+
+    rerender(
+      <ToolResultBubble
+        toolCallId="tc-3"
+        toolName="replaceText"
+        targetBlockId="b3"
+        result={{ ok: true, toolName: 'replaceText', currentDocumentRevision: 5, replacedText: 'slash' }}
+        dictionary={chatDictionaryZhCN}
+      />,
+    )
+    expect(screen.getByText(chatDictionaryZhCN.toolReplacedText)).toBeDefined()
   })
 
   test('result=conflict(revision-mismatch) 显示冲突与仅重试按钮', () => {

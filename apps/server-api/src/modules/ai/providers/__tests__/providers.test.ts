@@ -7,8 +7,8 @@ describe('allowlist', () => {
     // setup-env 默认未设置 GOOGLE_GENERATIVE_AI_API_KEY
     const dashscopeModels = models.filter((m) => m.provider === 'dashscope')
     expect(dashscopeModels.length).toBe(3)
-    expect(dashscopeModels.map((m) => m.id)).toContain('dashscope:qwen-plus')
-    expect(dashscopeModels.map((m) => m.id)).toContain('dashscope:qwen-max')
+    expect(dashscopeModels.map((m) => m.id)).toContain('dashscope:qwen3.7-plus')
+    expect(dashscopeModels.map((m) => m.id)).toContain('dashscope:qwen3.7-max')
     expect(dashscopeModels.map((m) => m.id)).toContain('dashscope:qwen3-vl-flash')
   })
 
@@ -19,8 +19,8 @@ describe('allowlist', () => {
   })
 
   test('isModelAllowed 对已列出 modelId 返回 true', () => {
-    expect(isModelAllowed('dashscope:qwen-plus')).toBe(true)
-    expect(isModelAllowed('dashscope:qwen-max')).toBe(true)
+    expect(isModelAllowed('dashscope:qwen3.7-plus')).toBe(true)
+    expect(isModelAllowed('dashscope:qwen3.7-max')).toBe(true)
     expect(isModelAllowed('dashscope:qwen3-vl-flash')).toBe(true)
   })
 
@@ -51,7 +51,7 @@ describe('providers', () => {
 
   test('resolveModel 对 allowlist 中的 modelId 返回 LanguageModel', async () => {
     const { resolveModel } = await import('../../services/resolve-model')
-    const model = resolveModel('dashscope:qwen-plus')
+    const model = resolveModel('dashscope:qwen3.7-plus')
     expect(model).toBeDefined()
   })
 

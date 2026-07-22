@@ -18,6 +18,9 @@
  * 依赖闭包不含 `@blocknote/xl-ai` 或任何 GPL/AGPL 依赖。
  */
 
+/** 默认模型 ID,服务端 allowlist 变更时只需改此处。 */
+export { DEFAULT_MODEL_ID } from './constants'
+
 /** Zod schema 与派生类型:`BlockOperation`、`DocumentState`、`ConflictResult`。 */
 export * from './types'
 
@@ -64,6 +67,43 @@ export type {
   /** 应用结果:成功 `void` 或冲突 `ConflictResult`。 */
   ApplyOperationsResult,
 } from './apply-operations'
+
+/** Block ID 协议后缀处理(进入 BlockNote editor API 边界前剥离 `$`)。 */
+export {
+  stripBlockIdSuffix,
+  stripBlockIdSuffixList,
+} from './block-id'
+
+/** `replaceText` 单一底层执行器(inline suggest 路径与 chat 客户端共用)。 */
+export {
+  resolveReplaceText,
+  applyReplaceTextToTransaction,
+  applyReplaceTextToEditor,
+} from './replace-text'
+export type {
+  /** `replaceText` 操作类型。 */
+  ReplaceTextOperation,
+  /** 解析后的替换位置与原文。 */
+  ResolvedReplaceText,
+  /** `resolveReplaceText` 结果:解析位置或冲突。 */
+  ResolveReplaceTextResult,
+  /** `applyReplaceTextToEditor` 成功结果。 */
+  ReplaceTextSuccess,
+  /** `applyReplaceTextToEditor` 结果:成功或冲突。 */
+  ApplyReplaceTextResult,
+} from './replace-text'
+
+/** block 文本抽取(replaceText 与 searchDocument 共用的偏移基准)。 */
+export { getBlockContentInfo } from './block-text'
+export type { BlockContentInfo } from './block-text'
+
+/** 文档搜索(search-then-replace 的查找端):定位文本所在块与偏移,供 replaceText 精确替换。 */
+export { searchDocument } from './search-document'
+export type {
+  DocumentSearchMatch,
+  DocumentSearchOptions,
+  DocumentSearchResult,
+} from './search-document'
 
 /** 创建 transport,封装 AI SDK v7 `DefaultChatTransport`,不持有 LLM Key。 */
 export {

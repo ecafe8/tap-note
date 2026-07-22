@@ -5,7 +5,7 @@ describe('createServerTransport', () => {
   test('返回 DefaultChatTransport 实例', () => {
     const transport = createServerTransport({
       baseUrl: '/api/ai/editor/streamText',
-      model: 'dashscope:qwen-plus',
+      model: 'dashscope:qwen3.7-plus',
     })
     expect(transport).toBeDefined()
     expect(typeof transport).toBe('object')
@@ -14,7 +14,7 @@ describe('createServerTransport', () => {
   test('不持有 LLM Key 字段', () => {
     const transport = createServerTransport({
       baseUrl: '/api/ai/editor/streamText',
-      model: 'dashscope:qwen-plus',
+      model: 'dashscope:qwen3.7-plus',
       getAuthHeaders: () => ({ Authorization: 'Bearer short-lived-jwt' }),
     })
     // 检查实例字段不包含 LLM 凭据
@@ -40,7 +40,7 @@ describe('createServerTransport', () => {
   test('getAuthHeaders 注入到 headers', () => {
     const transport = createServerTransport({
       baseUrl: '/api/ai/editor/streamText',
-      model: 'dashscope:qwen-plus',
+      model: 'dashscope:qwen3.7-plus',
       getAuthHeaders: () => ({
         Authorization: 'Bearer my-jwt',
         'X-User-ID': 'user-123',
@@ -59,7 +59,7 @@ describe('createServerTransport', () => {
     expect(() =>
       createServerTransport({
         baseUrl: '',
-        model: 'dashscope:qwen-plus',
+        model: 'dashscope:qwen3.7-plus',
       }),
     ).toThrow(/baseUrl/)
   })
@@ -68,7 +68,7 @@ describe('createServerTransport', () => {
     expect(() =>
       createServerTransport({
         baseUrl: 123 as unknown as string,
-        model: 'dashscope:qwen-plus',
+        model: 'dashscope:qwen3.7-plus',
       }),
     ).toThrow(/baseUrl/)
   })
@@ -85,7 +85,7 @@ describe('createServerTransport', () => {
   test('extraBody 合并到 body', () => {
     const transport = createServerTransport({
       baseUrl: '/api/ai/editor/streamText',
-      model: 'dashscope:qwen-plus',
+      model: 'dashscope:qwen3.7-plus',
       extraBody: { stream: true, sessionId: 's-1' },
     })
     const transportObj = transport as unknown as {
@@ -94,13 +94,13 @@ describe('createServerTransport', () => {
     const body = typeof transportObj.body === 'function' ? transportObj.body() : transportObj.body
     expect(body?.stream).toBe(true)
     expect(body?.sessionId).toBe('s-1')
-    expect(body?.model).toBe('dashscope:qwen-plus')
+    expect(body?.model).toBe('dashscope:qwen3.7-plus')
   })
 
   test('无 getAuthHeaders 时只有 Content-Type', () => {
     const transport = createServerTransport({
       baseUrl: '/api/ai/editor/streamText',
-      model: 'dashscope:qwen-plus',
+      model: 'dashscope:qwen3.7-plus',
     })
     const transportObj = transport as unknown as {
       headers?: Record<string, string> | (() => Record<string, string>)

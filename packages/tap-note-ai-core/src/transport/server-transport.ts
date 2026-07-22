@@ -10,7 +10,7 @@ export interface CreateServerTransportOptions {
    */
   baseUrl: string
   /**
-   * 模型 ID,例如 `dashscope:qwen-plus` 或 `google:gemini-2.0-flash`。
+   * 模型 ID,例如 `dashscope:qwen3.7-plus` 或 `google:gemini-2.0-flash`。
    * 由服务端路由解析,不在客户端解析为 provider。
    */
   model: string
@@ -44,7 +44,7 @@ export type Transport = DefaultChatTransport<UIMessage>
  * ```ts
  * const transport = createServerTransport({
  *   baseUrl: '/api/ai/editor/streamText',
- *   model: 'dashscope:qwen-plus',
+ *   model: 'dashscope:qwen3.7-plus',
  *   getAuthHeaders: () => ({ Authorization: `Bearer ${getJwt()}` }),
  * })
  * ```

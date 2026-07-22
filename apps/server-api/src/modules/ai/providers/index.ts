@@ -28,12 +28,12 @@ export function createLLMProvider(config: LLMConfig): Provider {
     apiKey: config.dashscope.apiKey,
     baseURL: config.dashscope.baseURL,
   })
-  languageModels['dashscope:qwen-plus'] = wrapLanguageModel({
-    model: dashscopeProvider('qwen-plus'),
+  languageModels['dashscope:qwen3.7-plus'] = wrapLanguageModel({
+    model: dashscopeProvider('qwen3.7-plus'),
     middleware: [defaultSimpleMiddleware],
   })
-  languageModels['dashscope:qwen-max'] = wrapLanguageModel({
-    model: dashscopeProvider('qwen-max'),
+  languageModels['dashscope:qwen3.7-max'] = wrapLanguageModel({
+    model: dashscopeProvider('qwen3.7-max'),
     middleware: [defaultSimpleMiddleware],
   })
   languageModels['dashscope:qwen3-vl-flash'] = wrapLanguageModel({
@@ -90,5 +90,5 @@ export const llmProvider: Provider = createLLMProvider(createLLMConfigFromEnv())
  * 修复自原脚手架 `defaultAgentModel` 导出缺失的问题。
  */
 export const defaultAgentModel: LanguageModel = llmProvider.languageModel(
-  'dashscope:qwen-plus',
+  'dashscope:qwen3.7-plus',
 )

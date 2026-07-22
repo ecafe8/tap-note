@@ -17,7 +17,7 @@ const mockEditor = {
 
 // 用 baseUrl 创建 transport
 function makeTransport() {
-  return createServerTransport({ baseUrl: '/api/ai/chat', model: 'dashscope:qwen-plus' })
+  return createServerTransport({ baseUrl: '/api/ai/chat', model: 'dashscope:qwen3.7-plus' })
 }
 
 describe('createTapNoteChatAssistant', () => {

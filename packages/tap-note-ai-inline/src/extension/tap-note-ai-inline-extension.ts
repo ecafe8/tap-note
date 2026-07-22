@@ -2,7 +2,7 @@ import { createExtension, type BlockNoteEditor } from '@blocknote/core'
 import { suggestChanges } from '@handlewithcare/prosemirror-suggest-changes'
 import { createStore } from '@blocknote/core'
 import type { Transport, DocumentStateBuilder, AIBusyState, BlockOperation, ConflictResult, SelectionTracker } from '@tap-note/ai-core'
-import { applyOperationsToEditor, layerContext, createDocumentStateBuilder, createSelectionTracker } from '@tap-note/ai-core'
+import { applyOperationsToEditor, layerContext, createDocumentStateBuilder, createSelectionTracker, DEFAULT_MODEL_ID } from '@tap-note/ai-core'
 import type { InlineState, InlineEvent } from './state-machine'
 import { transition } from './state-machine'
 import { processToolCallStream } from '../stream-tool-executor'
@@ -81,7 +81,7 @@ export interface AIInlineContext {
  */
 export function createAIInlineExtension(options: CreateTapNoteInlineAssistantOptions) {
   const dictionary = mergeDictionary(inlineDictionaryZhCN, options.dictionary) as InlineDictionary
-  const modelId = options.model ?? 'dashscope:qwen-plus'
+  const modelId = options.model ?? DEFAULT_MODEL_ID
 
   let editorRef: BlockNoteEditor | undefined
   let selectionTrackerRef: SelectionTracker | undefined
@@ -360,7 +360,7 @@ export function createAIInlineExtension(options: CreateTapNoteInlineAssistantOpt
  * 用法:
  * ```tsx
  * const inlineAssistant = createTapNoteInlineAssistant({
- *   transport: createServerTransport({ baseUrl: '/api/ai/editor/streamText', model: 'dashscope:qwen-plus', getAuthHeaders }),
+ *   transport: createServerTransport({ baseUrl: '/api/ai/editor/streamText', model: 'dashscope:qwen3.7-plus', getAuthHeaders }),
  *   aiBusyState: busy,
  * })
  * <TapNoteEditor inlineAssistant={inlineAssistant} aiBusyState={busy} />

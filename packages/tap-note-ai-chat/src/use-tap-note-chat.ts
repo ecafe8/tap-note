@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { lastAssistantMessageIsCompleteWithToolCalls } from 'ai'
 import type { BlockNoteEditor } from '@blocknote/core'
@@ -26,7 +26,7 @@ export interface UseTapNoteChatOptions {
   documentStateBuilder: DocumentStateBuilder
   /** BlockNote editor 实例。 */
   editor: BlockNoteEditor
-  /** 模型 ID(如 `"dashscope:qwen-plus"`),由集成方提供。 */
+  /** 模型 ID(如 `"dashscope:qwen3.7-plus"`),由集成方提供。 */
   model: string
   /** 可选的认证头注入(短期 JWT)。 */
   getAuthHeaders?: () => Record<string, string>
@@ -78,6 +78,16 @@ export interface UseTapNoteChatResult {
   }) => void
 }
 
+/** 判断 client tool 执行结果是否为 revision 冲突(用于多工具链自动重放)。 */
+function isRevisionMismatch(result: unknown): boolean {
+  return (
+    typeof result === 'object' &&
+    result !== null &&
+    (result as { kind?: string }).kind === 'conflict' &&
+    (result as { reason?: string }).reason === 'revision-mismatch'
+  )
+}
+
 /**
  * 封装 AI SDK v7 `useChat`,实现 `onToolCall` + `addToolOutput` 模式
  * (详见 feat-ai-chat/tech.md §14.3)。
@@ -122,27 +132,30 @@ export function useTapNoteChat(options: UseTapNoteChatOptions): UseTapNoteChatRe
     onToolCall: async ({ toolCall }) => {
       const { toolName, toolCallId, input } = toolCall
       try {
-        const result = await executeClientTool(
+        let result = await executeClientTool(
           toolName as ChatToolName,
           input,
           executeCtx,
         )
-        if ('ok' in result && result.ok) {
-          // 成功:addToolOutput 不能 await(避免死锁)
-          addToolOutputRef.current({
-            tool: toolName,
-            toolCallId,
-            output: result,
-          })
-        } else {
-          // 冲突:报告 output-error
-          addToolOutputRef.current({
-            tool: toolName,
-            toolCallId,
-            state: 'output-error',
-            errorText: (result as { message?: string }).message ?? dictionary.conflict,
-          })
+        // 多工具 revision 链:模型在同一消息内用相同 baseDocumentRevision 生成多个工具,
+        // 前一个工具执行后 revision 自增,后续工具会 revision-mismatch。此时用最新 revision
+        // 自动重放一次(executeClientTool 会重新校验 expectedText/块存在性;仍不满足则返回
+        // 冲突交由 UI 重试,不会应用过期编辑)。
+        if (isRevisionMismatch(result)) {
+          const replayedInput = {
+            ...(input as Record<string, unknown>),
+            baseDocumentRevision: executeCtx.documentStateBuilder.documentRevision,
+          }
+          result = await executeClientTool(toolName as ChatToolName, replayedInput, executeCtx)
         }
+        // 成功与结构化冲突(revision/precondition)均作为真实 output 回传(output-available),
+        // UI 据 output 形状区分成功/冲突;仅 Zod 校验等未预期异常走下方 catch → output-error。
+        // addToolOutput 不能 await(避免死锁)。绝不伪造成功。
+        addToolOutputRef.current({
+          tool: toolName,
+          toolCallId,
+          output: result,
+        })
       } catch (err) {
         addToolOutputRef.current({
           tool: toolName,
@@ -231,8 +244,13 @@ export function useTapNoteChat(options: UseTapNoteChatOptions): UseTapNoteChatRe
     [onContextModeChange],
   )
 
-  const isBusy = aiBusyState.isBusy
-  const busyReason = aiBusyState.isBusy ? dictionary.chatBusy : null
+  // 订阅 aiBusyState:release() 后必须触发重渲染,否则 UI 会卡在「进行中」、输入框永久禁用。
+  const isBusy = useSyncExternalStore(
+    (onChange) => aiBusyState.subscribe(() => onChange()),
+    () => aiBusyState.isBusy,
+    () => false,
+  )
+  const busyReason = isBusy ? dictionary.chatBusy : null
 
   return {
     messages: chat.messages,

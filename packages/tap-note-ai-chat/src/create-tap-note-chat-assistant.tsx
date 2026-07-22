@@ -6,14 +6,14 @@ import type {
   SelectionTracker,
   Transport,
 } from '@tap-note/ai-core'
-import { createDocumentStateBuilder, createSelectionTracker } from '@tap-note/ai-core'
+import { createDocumentStateBuilder, createSelectionTracker, stripBlockIdSuffix, DEFAULT_MODEL_ID } from '@tap-note/ai-core'
 import { TapNoteChatPanel } from './tap-note-chat-panel'
 import type { TapNoteChatPanelProps } from './tap-note-chat-panel'
 import { type ChatDictionary, mergeChatDictionary } from './i18n/zh-cn'
 import { DEFAULT_CONTEXT_MODE, type ContextMode } from './context/context-mode'
 import { chatLayerContext, getContextHintKey, buildDocumentState } from './context/context-layer'
 import { useTapNoteChat } from './use-tap-note-chat'
-import { ToolResultBubble } from './tools/tool-result-bubble'
+import { ToolResultBubble, type ToolResult } from './tools/tool-result-bubble'
 import { findTargetBlockIdFromMessages } from './tools/tool-result-helpers'
 
 /**
@@ -24,7 +24,7 @@ export interface CreateTapNoteChatAssistantOptions {
   transport: Transport
   /** AI-core busy state 实例(来自 `createAIBusyState`,与 `TapNoteEditor.aiBusyState` 共享)。 */
   aiBusyState: AIBusyState
-  /** 模型 ID(如 `"dashscope:qwen-plus"`)。 */
+  /** 模型 ID(如 `"dashscope:qwen3.7-plus"`)。 */
   model?: string
   /** 字典覆盖(扩展 ai-core `AICoreDictionary`)。 */
   dictionary?: Partial<ChatDictionary>
@@ -67,12 +67,34 @@ export interface ChatPanelProps {
 }
 
 /**
+ * 从 tool-call part 的真实状态/输出派生 `ToolResult`(供 `ToolResultBubble` 渲染)。
+ *
+ * - `output-available`:真实 output,可能是成功(`ToolSuccessResult`)或结构化冲突(`ConflictResult`)。
+ * - `output-error`:未预期异常(如 Zod 校验失败),映射为 `{ kind: 'error', message }`。
+ * - 其它(input-streaming/input-available):尚无结果,返回 `undefined`(气泡显示「输入中」)。
+ *
+ * 绝不从 `output-available` 伪造成功;成功与否完全由真实 output 的形状决定。
+ */
+function deriveToolResult(
+  p: { state?: string; output?: unknown; errorText?: string },
+  dictionary: ChatDictionary,
+): ToolResult | undefined {
+  if (p.state === 'output-available') {
+    return p.output as ToolResult
+  }
+  if (p.state === 'output-error') {
+    return { kind: 'error', message: p.errorText ?? dictionary.toolFailed }
+  }
+  return undefined
+}
+
+/**
  * 创建 TapNote 对话助手实例。
  *
  * 最小接入:
  * ```tsx
  * const chatAssistant = createTapNoteChatAssistant({
- *   transport: createServerTransport({ api: '/api/ai/chat', model: 'dashscope:qwen-plus' }),
+ *   transport: createServerTransport({ api: '/api/ai/chat', model: 'dashscope:qwen3.7-plus' }),
  *   aiBusyState: busy,
  * })
  * <TapNoteEditor chatAssistant={chatAssistant} aiBusyState={busy} />
@@ -83,7 +105,7 @@ export function createTapNoteChatAssistant(
   options: CreateTapNoteChatAssistantOptions,
 ): TapNoteChatAssistant {
   const dictionary = mergeChatDictionary(options.dictionary)
-  const modelId = options.model ?? 'dashscope:qwen-plus'
+  const modelId = options.model ?? DEFAULT_MODEL_ID
   const allowSnapshotTool = options.allowSnapshotTool ?? true
 
   // mount 时填充的内部状态(用 mutable ref-like 对象)
@@ -189,8 +211,8 @@ export function createTapNoteChatAssistant(
       )
     })
 
-    // 渲染工具结果气泡(基于 messages 中的 tool-call parts)
-    const toolResultBubbles = chat.messages.flatMap((m: { parts?: Array<{ type?: string; toolCallId?: string; toolName?: string; input?: unknown; state?: string }> }) => {
+    // 渲染工具结果气泡(基于 messages 中的 tool-call parts,消费真实 tool output)
+    const toolResultBubbles = chat.messages.flatMap((m: { parts?: Array<{ type?: string; toolCallId?: string; toolName?: string; input?: unknown; state?: string; output?: unknown; errorText?: string }> }) => {
       const parts = m.parts ?? []
       return parts
         .filter((p) => p.type === 'tool-call')
@@ -203,7 +225,7 @@ export function createTapNoteChatAssistant(
               toolCallId={p.toolCallId ?? ''}
               toolName={p.toolName ?? ''}
               targetBlockId={targetBlockId}
-              result={p.state === 'output-available' ? { ok: true, currentDocumentRevision: 0 } : undefined}
+              result={deriveToolResult(p, dictionary)}
               dictionary={dictionary}
               onRetry={(tcid) => {
                 // 重试用最新 revision 重新 execute:简化实现为重新触发 sendMessage(占位)
@@ -211,7 +233,8 @@ export function createTapNoteChatAssistant(
               }}
               onJumpToBlock={(targetId) => {
                 try {
-                  editor.setTextCursorPosition(targetId as never)
+                  // 跳转前剥离 `$` 协议后缀,使用真实 block ID
+                  editor.setTextCursorPosition(stripBlockIdSuffix(targetId) as never)
                 } catch {
                   // 目标块不存在时忽略
                 }

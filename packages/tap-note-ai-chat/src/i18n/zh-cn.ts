@@ -42,6 +42,12 @@ export interface ChatDictionary extends AICoreDictionary {
   jumpToBlock: string
   /** 工具结果气泡中的目标块标签。 */
   toolTarget: string
+  /** tool 执行成功(已替换文本)文案。 */
+  toolReplacedText: string
+  /** tool 执行成功(已查找文档)文案。 */
+  toolSearched: string
+  /** 模型未调用编辑工具时,提示未真正执行编辑操作。 */
+  noEditPerformed: string
   /** 选区 chip 文案(`{count}` 为块数量占位符)。 */
   selectionChip: string
   /** selection 模式但无选区时的提示文案。 */
@@ -85,6 +91,9 @@ export const chatDictionaryZhCN: ChatDictionary = {
   toolFailed: '操作失败',
   jumpToBlock: '跳转到该块',
   toolTarget: '目标',
+  toolReplacedText: '已替换文本',
+  toolSearched: '已查找文档',
+  noEditPerformed: '未执行编辑操作',
   selectionChip: '已选 {count} 个块',
   selectionEmptyHint: '在编辑器中选中文字以引用选区',
   clearSelection: '清除选区',

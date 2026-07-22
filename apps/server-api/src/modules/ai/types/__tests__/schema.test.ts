@@ -21,7 +21,7 @@ describe('editorStreamTextRequestSchema', () => {
     const result = editorStreamTextRequestSchema.safeParse({
       messages: [{ id: 'u-1', role: 'user', parts: [{ type: 'text', text: 'hi' }] }],
       documentState: makeDocumentState(),
-      model: 'dashscope:qwen-plus',
+      model: 'dashscope:qwen3.7-plus',
     })
     expect(result.success).toBe(true)
   })
@@ -29,7 +29,7 @@ describe('editorStreamTextRequestSchema', () => {
   test('缺 messages 抛 ZodError', () => {
     const result = editorStreamTextRequestSchema.safeParse({
       documentState: makeDocumentState(),
-      model: 'dashscope:qwen-plus',
+      model: 'dashscope:qwen3.7-plus',
     })
     expect(result.success).toBe(false)
   })
@@ -46,7 +46,7 @@ describe('editorStreamTextRequestSchema', () => {
     const result = editorStreamTextRequestSchema.safeParse({
       messages: [{ id: 'u-1', role: 'user', parts: [] }],
       documentState: makeDocumentState(),
-      model: 'dashscope:qwen-plus',
+      model: 'dashscope:qwen3.7-plus',
       tools: { someTool: {} },
     })
     expect(result.success).toBe(true)
@@ -56,7 +56,7 @@ describe('editorStreamTextRequestSchema', () => {
     const result = editorStreamTextRequestSchema.safeParse({
       messages: [{ id: 'u-1', role: 'user', parts: [] }],
       documentState: makeDocumentState(),
-      model: 'dashscope:qwen-plus',
+      model: 'dashscope:qwen3.7-plus',
       toolDefinitions: {},
     })
     expect(result.success).toBe(true)
@@ -66,7 +66,7 @@ describe('editorStreamTextRequestSchema', () => {
     const result = editorStreamTextRequestSchema.safeParse({
       messages: [{ id: 'u-1', role: 'user', parts: [] }],
       documentState: { format: 'wrong' },
-      model: 'dashscope:qwen-plus',
+      model: 'dashscope:qwen3.7-plus',
     })
     expect(result.success).toBe(false)
   })
@@ -75,7 +75,7 @@ describe('editorStreamTextRequestSchema', () => {
     const result = editorStreamTextRequestSchema.safeParse({
       messages: [{ id: 'u-1', role: 'user', parts: [] }],
       documentState: makeDocumentState(),
-      model: 'dashscope:qwen-plus',
+      model: 'dashscope:qwen3.7-plus',
       extraField: 'bad',
     })
     expect(result.success).toBe(true)
@@ -88,7 +88,7 @@ describe('chatRequestSchema', () => {
       messages: [{ id: 'u-1', role: 'user', parts: [{ type: 'text', text: 'hi' }] }],
       documentState: makeDocumentState(),
       documentRevision: 0,
-      model: 'dashscope:qwen-plus',
+      model: 'dashscope:qwen3.7-plus',
     })
     expect(result.success).toBe(true)
   })
@@ -96,7 +96,7 @@ describe('chatRequestSchema', () => {
   test('documentState 缺省通过(不引用模式)', () => {
     const result = chatRequestSchema.safeParse({
       messages: [{ id: 'u-1', role: 'user', parts: [] }],
-      model: 'dashscope:qwen-plus',
+      model: 'dashscope:qwen3.7-plus',
     })
     expect(result.success).toBe(true)
   })
@@ -104,7 +104,7 @@ describe('chatRequestSchema', () => {
   test('documentRevision 缺省通过', () => {
     const result = chatRequestSchema.safeParse({
       messages: [{ id: 'u-1', role: 'user', parts: [] }],
-      model: 'dashscope:qwen-plus',
+      model: 'dashscope:qwen3.7-plus',
     })
     expect(result.success).toBe(true)
   })
@@ -114,7 +114,7 @@ describe('modelsResponseSchema', () => {
   test('合法响应通过', () => {
     const result = modelsResponseSchema.safeParse({
       models: [
-        { id: 'dashscope:qwen-plus', label: 'Qwen Plus', provider: 'dashscope', capabilities: {} },
+        { id: 'dashscope:qwen3.7-plus', label: 'Qwen Plus', provider: 'dashscope', capabilities: {} },
       ],
     })
     expect(result.success).toBe(true)

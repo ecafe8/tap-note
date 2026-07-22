@@ -88,7 +88,26 @@ const moveBlockOperationSchema = z.object({
 })
 
 /**
- * `BlockOperation` Zod schema,覆盖五种操作。所有操作 MUST 携带 `baseDocumentRevision`
+ * `replaceText` 操作:在 `targetBlockId` 块的拼接纯文本上,把 `[from, to)` 范围
+ * (零基 offset,含 from 不含 to)替换为 `replacement`。
+ *
+ * - `expectedText` 用于 compare-and-swap:执行前校验当前 `[from, to)` 文本等于它,
+ *   不等则拒绝(避免覆盖用户在模型生成后所做的修改)。
+ * - 结构校验在此保证 `0 ≤ from`、`to ≥ 1`;`from < to` 与 `to ≤ 文本长度` 由执行器
+ *   结合真实文档校验(discriminatedUnion 成员无法携带跨字段 refine)。
+ */
+const replaceTextOperationSchema = z.object({
+  ...baseOperationFields,
+  type: z.literal('replaceText'),
+  targetBlockId: blockIdSchema,
+  from: z.number().int().nonnegative(),
+  to: z.number().int().positive(),
+  expectedText: z.string(),
+  replacement: z.string(),
+})
+
+/**
+ * `BlockOperation` Zod schema,覆盖六种操作。所有操作 MUST 携带 `baseDocumentRevision`
  * 与目标块 ID 或前置条件。`.parse()` 失败抛出 `ZodError`,不静默。
  */
 export const blockOperationSchema = z.discriminatedUnion('type', [
@@ -97,6 +116,7 @@ export const blockOperationSchema = z.discriminatedUnion('type', [
   deleteBlockOperationSchema,
   replaceBlocksOperationSchema,
   moveBlockOperationSchema,
+  replaceTextOperationSchema,
 ])
 
 /**

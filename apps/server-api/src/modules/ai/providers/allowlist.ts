@@ -32,14 +32,14 @@ export interface ModelInfo {
  */
 const STATIC_MODELS: ModelInfo[] = [
   {
-    id: 'dashscope:qwen-plus',
-    label: 'Qwen Plus',
+    id: 'dashscope:qwen3.7-plus',
+    label: 'Qwen 3.7 Plus',
     provider: 'dashscope',
     capabilities: { streamingTools: true, multimodal: false, reasoning: false },
   },
   {
-    id: 'dashscope:qwen-max',
-    label: 'Qwen Max',
+    id: 'dashscope:qwen3.7-max',
+    label: 'Qwen 3.7 Max',
     provider: 'dashscope',
     capabilities: { streamingTools: true, multimodal: false, reasoning: false },
   },

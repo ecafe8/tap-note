@@ -60,6 +60,10 @@ function buildDocumentStateParts(state: {
         type: 'text',
         text: JSON.stringify(state.blocks),
       } as const,
+      {
+        type: 'text',
+        text: TOOL_USAGE_REMINDER,
+      } as const,
     ]
   }
   return [
@@ -73,7 +77,18 @@ function buildDocumentStateParts(state: {
     } as const,
     {
       type: 'text',
-      text: 'REMINDER: Block IDs in the document state above are SUFFIXED with `$`. For referenceBlockId / targetBlockId / targetBlockIds, copy the id EXACTLY as shown (including the trailing `$`). IDs without `$` are hallucinated and will be rejected. Never invent IDs.',
+      text: TOOL_USAGE_REMINDER,
     } as const,
   ]
 }
+
+/**
+ * 注入到 documentState 后的工具使用提醒(与 server-api `CHAT_SYSTEM_PROMPT` 协同)。
+ *
+ * - 强调修改文档**必须**调用编辑工具,不得仅用自然语言声称完成。
+ * - 文本级编辑优先 `replaceText`(from/to 为块纯文本零基 offset + expectedText 校验)。
+ * - block ID 带 `$` 后缀,仅在模型协议层存在;客户端在進入 editor API 边界时剥离,
+ *   因此模型必须精确复制带 `$` 的 ID。
+ */
+const TOOL_USAGE_REMINDER =
+  'REMINDER: To modify the document you MUST call an editing tool (insertBlock / updateBlock / deleteBlock / replaceBlocks / moveBlock / replaceText); never claim a modification you did not perform via a tool. To change text WITHIN a block: if you are not certain of the exact block and character offsets, FIRST call searchDocument with the target text (e.g. the word to change) to locate it — it returns matches with blockId, from, to and matchedText; THEN call replaceText using that blockId as targetBlockId, the returned from/to, and matchedText as expectedText. Do NOT guess character offsets. Block IDs are SUFFIXED with `$`: for referenceBlockId / targetBlockId / targetBlockIds copy the id EXACTLY as shown INCLUDING the trailing `$` (IDs without `$` are rejected as hallucinated). The `$` is a protocol marker only; the editor strips it before applying.'

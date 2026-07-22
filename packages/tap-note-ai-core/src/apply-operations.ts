@@ -14,6 +14,8 @@ import {
 import type { Transaction } from 'prosemirror-state'
 import type { BlockOperation, ConflictResult } from './types/type'
 import { blockOperationSchema } from './types/schema'
+import { stripBlockIdSuffix } from './block-id'
+import { applyReplaceTextToTransaction } from './replace-text'
 
 /**
  * 应用模式。
@@ -166,7 +168,7 @@ function checkPreconditions(
 ): ConflictResult | undefined {
   for (const op of operations) {
     const missing = collectTargetIds(op)
-      .map(stripIdSuffix)
+      .map(stripBlockIdSuffix)
       .filter((id) => !getNodeById(id, editor.prosemirrorState.doc))
     if (missing.length > 0) {
       return {
@@ -193,18 +195,9 @@ function collectTargetIds(op: BlockOperation): string[] {
       return op.targetBlockIds
     case 'moveBlock':
       return [op.targetBlockId, op.referenceBlockId]
+    case 'replaceText':
+      return [op.targetBlockId]
   }
-}
-
-/**
- * 剥掉 `DocumentStateBuilder` 给 block id 加的 `$` 后缀。
- *
- * - 真实块 ID 在发送给 LLM 前被加了 `$` 后缀(参见 `document-state-builder.ts` 的 `suffixBlockIds`),
- *   LLM 回传的 `referenceBlockId`/`targetBlockId` 会带 `$`,这里在 lookup 前透明剥掉。
- * - 若 id 不带 `$`(如直接调用 `applyOperationsToEditor` 的测试/老路径),原样返回,保持向后兼容。
- */
-function stripIdSuffix(id: string): string {
-  return id.endsWith('$') ? id.slice(0, -1) : id
 }
 
 function applyOperationsToTransaction(
@@ -229,17 +222,17 @@ function applyOperationToTransaction(
         tr,
         [op.block] as PartialBlock[],
         op.referenceBlockId
-          ? stripIdSuffix(op.referenceBlockId)
+          ? stripBlockIdSuffix(op.referenceBlockId)
           : getFirstBlockId(editor),
         op.position,
       )
       return
     case 'updateBlock':
       validateBlockForEditor(op.block, editor)
-      updateBlock(tr, stripIdSuffix(op.targetBlockId), op.block as PartialBlock)
+      updateBlock(tr, stripBlockIdSuffix(op.targetBlockId), op.block as PartialBlock)
       return
     case 'deleteBlock':
-      removeAndInsertBlocks(tr, [stripIdSuffix(op.targetBlockId)], [])
+      removeAndInsertBlocks(tr, [stripBlockIdSuffix(op.targetBlockId)], [])
       return
     case 'replaceBlocks':
       for (const b of op.blocks) {
@@ -247,14 +240,14 @@ function applyOperationToTransaction(
       }
       removeAndInsertBlocks(
         tr,
-        op.targetBlockIds.map(stripIdSuffix),
+        op.targetBlockIds.map(stripBlockIdSuffix),
         op.blocks as PartialBlock[],
       )
       return
     case 'moveBlock': {
       // BlockNote 没有直接 moveBlockTo(reference, position) API,
       // 用 getNodeById + nodeToBlock 复制块内容,然后 remove + insert 到新位置
-      const strippedTargetId = stripIdSuffix(op.targetBlockId)
+      const strippedTargetId = stripBlockIdSuffix(op.targetBlockId)
       const targetInfo = getNodeById(strippedTargetId, tr.doc)
       if (!targetInfo) {
         throw new Error(`moveBlock: target block ${strippedTargetId} not found`)
@@ -264,9 +257,13 @@ function applyOperationToTransaction(
       // 删除原位置
       removeAndInsertBlocks(tr, [strippedTargetId], [])
       // 在新位置插入(保留原 ID)
-      insertBlocks(tr, [movedBlock], stripIdSuffix(op.referenceBlockId), op.position)
+      insertBlocks(tr, [movedBlock], stripBlockIdSuffix(op.referenceBlockId), op.position)
       return
     }
+    case 'replaceText':
+      // 复用 ai-core 单一执行器;校验失败抛错,由 suggest 路径拒绝整个批次
+      applyReplaceTextToTransaction(tr, op)
+      return
   }
 }
 

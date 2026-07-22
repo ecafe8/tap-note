@@ -2,9 +2,9 @@ import { BrowserRouter, Routes, Route, NavLink, useNavigate } from 'react-router
 import { TapNoteEditor } from '@tap-note/editor'
 import type { Block } from '@tap-note/editor'
 import { Button } from '@workspace/ui/components/button'
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useEffect, useState, useSyncExternalStore, useMemo, type ReactNode } from 'react'
 import { useTheme } from '@/components/theme-provider.tsx'
-import { createAIBusyState, createServerTransport } from '@tap-note/ai-core'
+import { createAIBusyState, createServerTransport, DEFAULT_MODEL_ID } from '@tap-note/ai-core'
 import { createTapNoteInlineAssistant } from '@tap-note/ai-inline'
 import type { AIInlineStoreState } from '@tap-note/ai-inline'
 import { createTapNoteChatAssistant } from '@tap-note/ai-chat'
@@ -23,21 +23,27 @@ const INITIAL_CONTENT = [
 
 const aiBusyState = createAIBusyState()
 
-const inlineAssistant = createTapNoteInlineAssistant({
-  transport: createServerTransport({
-    baseUrl: '/api/ai/editor/streamText',
-    model: 'dashscope:qwen-plus',
-  }),
-  aiBusyState,
-})
+function useAIAssistants(model: string) {
+  return useMemo(() => {
+    const inlineAssistant = createTapNoteInlineAssistant({
+      transport: createServerTransport({
+        baseUrl: '/api/ai/editor/streamText',
+        model,
+      }),
+      aiBusyState,
+    })
 
-const chatAssistant = createTapNoteChatAssistant({
-  transport: createServerTransport({
-    baseUrl: '/api/ai/chat',
-    model: 'dashscope:qwen-plus',
-  }),
-  aiBusyState,
-})
+    const chatAssistant = createTapNoteChatAssistant({
+      transport: createServerTransport({
+        baseUrl: '/api/ai/chat',
+        model,
+      }),
+      aiBusyState,
+    })
+
+    return { inlineAssistant, chatAssistant }
+  }, [model])
+}
 
 type ResolvedTheme = 'light' | 'dark'
 
@@ -62,7 +68,7 @@ function ThemeToggleButton() {
   return <Button variant="outline" size="sm" onClick={() => setTheme(next)}>切换主题({theme})</Button>
 }
 
-function useAIInlineState(): AIInlineStoreState {
+function useAIInlineState(inlineAssistant: ReturnType<typeof createTapNoteInlineAssistant>): AIInlineStoreState {
   const ctx = inlineAssistant.context!
   const store = ctx.store
   return useSyncExternalStore(
@@ -72,8 +78,8 @@ function useAIInlineState(): AIInlineStoreState {
   )
 }
 
-function AIMenuPanel({ onClose }: { onClose: () => void }) {
-  const aiState = useAIInlineState()
+function AIMenuPanel({ inlineAssistant, onClose }: { inlineAssistant: ReturnType<typeof createTapNoteInlineAssistant>; onClose: () => void }) {
+  const aiState = useAIInlineState(inlineAssistant)
   const [input, setInput] = useState('')
   const state = aiState.state
   const ctx = inlineAssistant.context!
@@ -143,15 +149,14 @@ function AIMenuPanel({ onClose }: { onClose: () => void }) {
 }
 
 interface EditorPaneProps {
-  /** 是否显示 inline AI 浮层。 */
   showInline?: boolean
-  /** 是否挂载 chat 助手到编辑器。 */
   showChat?: boolean
-  /** 编辑器操作栏右侧附加内容(如对话抽屉开关)。 */
   actions?: ReactNode
+  inlineAssistant: ReturnType<typeof createTapNoteInlineAssistant>
+  chatAssistant: ReturnType<typeof createTapNoteChatAssistant>
 }
 
-function EditorPane({ showInline, showChat, actions }: EditorPaneProps) {
+function EditorPane({ showInline, showChat, actions, inlineAssistant, chatAssistant }: EditorPaneProps) {
   const [blocks, setBlocks] = useState<Block[] | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const resolvedTheme = useResolvedTheme()
@@ -190,36 +195,41 @@ function EditorPane({ showInline, showChat, actions }: EditorPaneProps) {
           aiBusyState={aiBusyState}
         />
       </main>
-      {showInline && menuOpen ? <AIMenuPanel onClose={handleClose} /> : null}
+      {showInline && menuOpen ? <AIMenuPanel inlineAssistant={inlineAssistant} onClose={handleClose} /> : null}
     </div>
   )
 }
 
-function ModelAndThemeBar() {
-  const [model, setModel] = useState('dashscope:qwen-plus')
+function ModelAndThemeBar({ model, onModelChange }: { model: string; onModelChange: (m: string) => void }) {
   return (
     <div className="tn-demo-toolbar">
-      <ModelSelector value={model} onChange={setModel} />
+      <ModelSelector value={model} onChange={onModelChange} />
       <ThemeToggleButton />
     </div>
   )
 }
 
 function InlineRoute() {
+  const [model, setModel] = useState(DEFAULT_MODEL_ID)
+  const { inlineAssistant, chatAssistant } = useAIAssistants(model)
   return (
     <EditorPaperLayout>
-      <ModelAndThemeBar />
-      <EditorPane showInline />
+      <ModelAndThemeBar model={model} onModelChange={setModel} />
+      <EditorPane showInline inlineAssistant={inlineAssistant} chatAssistant={chatAssistant} />
     </EditorPaperLayout>
   )
 }
 
 function ChatRoute() {
+  const [model, setModel] = useState(DEFAULT_MODEL_ID)
+  const { inlineAssistant, chatAssistant } = useAIAssistants(model)
   return (
     <EditorPaperLayout>
-      <ModelAndThemeBar />
+      <ModelAndThemeBar model={model} onModelChange={setModel} />
       <EditorPane
         showChat
+        inlineAssistant={inlineAssistant}
+        chatAssistant={chatAssistant}
         actions={
           <ChatDrawer>
             {chatAssistant.panel ? <chatAssistant.panel /> : null}
@@ -231,12 +241,16 @@ function ChatRoute() {
 }
 
 function BothRoute() {
+  const [model, setModel] = useState(DEFAULT_MODEL_ID)
+  const { inlineAssistant, chatAssistant } = useAIAssistants(model)
   return (
     <EditorPaperLayout>
-      <ModelAndThemeBar />
+      <ModelAndThemeBar model={model} onModelChange={setModel} />
       <EditorPane
         showInline
         showChat
+        inlineAssistant={inlineAssistant}
+        chatAssistant={chatAssistant}
         actions={
           <ChatDrawer>
             {chatAssistant.panel ? <chatAssistant.panel /> : null}

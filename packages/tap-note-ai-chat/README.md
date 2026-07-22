@@ -21,7 +21,7 @@ const aiBusyState = createAIBusyState()
 const chatAssistant = createTapNoteChatAssistant({
   transport: createServerTransport({
     baseUrl: '/api/ai/chat',
-    model: 'dashscope:qwen-plus',
+    model: 'dashscope:qwen3.7-plus',
   }),
   aiBusyState,
   // 可选:覆盖字典、关闭 getDocumentSnapshot 工具等

@@ -44,7 +44,7 @@ bun run format           # prettier write
 - **server-api 端口 4100**；web vite proxy `/api` → `http://localhost:4100`。
 - **纯组件产品**：编辑器/组件包中不含持久化。Demo 刷新丢内容是预期行为。
 - **AI 互斥**：同一编辑器会话同一时刻只能有一个 AI 任务（内联或对话），由 ai-core 的 `createAIBusyState()` 管理。
-- **模型 ID 格式**：`<provider>:<model>`（如 `dashscope:qwen-plus`）。服务端拒绝未列出的模型，不回退默认。
+- **模型 ID 格式**：`<provider>:<model>`（如 `dashscope:qwen3.7-plus`）。服务端拒绝未列出的模型，不回退默认。
 - **API 信封**：非流式端点返回 `{ code, message, data }`；流式 AI 端点直接返回 UIMessageStream（无信封）。
 
 ## 代码风格

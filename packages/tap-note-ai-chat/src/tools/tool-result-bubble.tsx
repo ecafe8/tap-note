@@ -33,6 +33,8 @@ function getOperationLabel(toolName: string, dictionary: ChatDictionary): string
     case 'deleteBlock': return dictionary.toolDeleted
     case 'replaceBlocks': return dictionary.toolReplaced
     case 'moveBlock': return dictionary.toolMoved
+    case 'replaceText': return dictionary.toolReplacedText
+    case 'searchDocument': return dictionary.toolSearched
     case 'getDocumentSnapshot': return '文档快照'
     default: return toolName
   }

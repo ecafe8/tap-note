@@ -73,7 +73,7 @@ const busy = createAIBusyState()
 // 2. 创建 transport(指向 FEAT-005 服务端,不持有 LLM Key)
 const transport = createServerTransport({
   baseUrl: '/api/ai/editor/streamText',
-  model: 'dashscope:qwen-plus',
+  model: 'dashscope:qwen3.7-plus',
   getAuthHeaders: () => ({ Authorization: `Bearer ${getJwt()}` }),
 })
 

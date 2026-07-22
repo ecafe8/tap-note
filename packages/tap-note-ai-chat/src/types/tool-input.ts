@@ -43,6 +43,22 @@ export const moveBlockToolInputSchema = z.object({
   baseDocumentRevision: baseDocumentRevisionSchema,
 })
 
+export const replaceTextToolInputSchema = z.object({
+  targetBlockId: blockIdSchema,
+  from: z.number().int().nonnegative(),
+  to: z.number().int().positive(),
+  expectedText: z.string(),
+  replacement: z.string(),
+  baseDocumentRevision: baseDocumentRevisionSchema,
+})
+
+export const searchDocumentToolInputSchema = z.object({
+  query: z.string().min(1),
+  isRegex: z.boolean().optional(),
+  caseSensitive: z.boolean().optional(),
+  maxResults: z.number().int().positive().optional(),
+})
+
 export const getDocumentSnapshotToolInputSchema = z.object({
   fromBlock: blockIdSchema.optional(),
   maxBlocks: z.number().int().positive().optional(),
@@ -54,19 +70,36 @@ export type UpdateBlockToolInput = z.infer<typeof updateBlockToolInputSchema>
 export type DeleteBlockToolInput = z.infer<typeof deleteBlockToolInputSchema>
 export type ReplaceBlocksToolInput = z.infer<typeof replaceBlocksToolInputSchema>
 export type MoveBlockToolInput = z.infer<typeof moveBlockToolInputSchema>
+export type ReplaceTextToolInput = z.infer<typeof replaceTextToolInputSchema>
+export type SearchDocumentToolInput = z.infer<typeof searchDocumentToolInputSchema>
 export type GetDocumentSnapshotToolInput = z.infer<typeof getDocumentSnapshotToolInputSchema>
 
-/** 工具执行成功的结果。携带最新 revision 供 LLM 后续操作使用。 */
+/**
+ * 工具执行成功的结果。携带操作类型、最新 revision 与目标信息,供 LLM 后续操作与 UI 展示。
+ *
+ * - `toolName`:回显操作类型(模型与 UI 据此判断做了什么)。
+ * - `currentDocumentRevision`:执行后的最新 revision,供多工具序列的下一步使用。
+ * - `targetBlockId`:目标块 ID(保留 `$` 后缀,用于 UI 展示/跳转)。
+ * - `replacedText`:`replaceText` 专用,被替换的原文。
+ * - `matches`/`truncated`:`searchDocument` 专用,命中列表与是否截断。
+ */
 export interface ToolSuccessResult {
   ok: true
+  toolName: ChatToolName
   currentDocumentRevision: number
+  targetBlockId?: string
+  replacedText?: string
+  matches?: unknown[]
+  truncated?: boolean
 }
 
-/** 6 个 client-side tool 名字。 */
+/** 8 个 client-side tool 名字。 */
 export type ChatToolName =
   | 'insertBlock'
   | 'updateBlock'
   | 'deleteBlock'
   | 'replaceBlocks'
   | 'moveBlock'
+  | 'replaceText'
+  | 'searchDocument'
   | 'getDocumentSnapshot'

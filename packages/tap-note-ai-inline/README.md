@@ -26,7 +26,7 @@ const busy = createAIBusyState()
 const inlineAssistant = createTapNoteInlineAssistant({
   transport: createServerTransport({
     baseUrl: '/api/ai/editor/streamText',
-    model: 'dashscope:qwen-plus',
+    model: 'dashscope:qwen3.7-plus',
     getAuthHeaders: () => ({ Authorization: `Bearer ${getJwt()}` }),
   }),
   aiBusyState: busy,

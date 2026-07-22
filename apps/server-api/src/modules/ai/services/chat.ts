@@ -7,20 +7,24 @@ import { ContextTooLargeError } from '../../../errors'
 import type { ChatRequest } from '../types'
 import type { ChatContextMode } from '../types/schema'
 import {
+  CHAT_SYSTEM_PROMPT,
   insertBlockToolInputSchema,
   updateBlockToolInputSchema,
   deleteBlockToolInputSchema,
   replaceBlocksToolInputSchema,
   moveBlockToolInputSchema,
+  replaceTextToolInputSchema,
+  searchDocumentToolInputSchema,
   getDocumentSnapshotToolInputSchema,
 } from '../types/schema'
 
 /**
- * 对话端点 6 个 client-side tools schema(服务端只声明,不 execute)。
+ * 对话端点 8 个 client-side tools schema(服务端只声明 `description` + `inputSchema`,不提供 `execute`)。
  *
  * 与 ai-core `blockSchema`/`blockOperationSchema` 同源(派生而非重新定义)。
- * 服务端 `execute` 始终返回 `{ ok: true }` 占位;实际编辑器操作由客户端
- * `onToolCall` + `addToolOutput` 执行并回传结果。
+ * **服务端不执行任何编辑工具**:工具的实际执行由客户端 `onToolCall` + `addToolOutput`
+ * 完成并回传真实结果。服务端若提供占位 `execute` 会抢先执行并返回假成功,导致
+ * 「AI 声称已修改但文档未变」,因此这里 MUST NOT 提供 `execute`。
  *
  * 工具列表:
  * - `insertBlock` — 在指定位置插入块
@@ -28,38 +32,44 @@ import {
  * - `deleteBlock` — 删除目标块
  * - `replaceBlocks` — 替换多个块
  * - `moveBlock` — 移动块
+ * - `replaceText` — 替换块内文本范围(compare-and-swap)
+ * - `searchDocument` — 按文本搜索文档,返回块 ID 与偏移(只读,所有模式可用)
  * - `getDocumentSnapshot` — 按需读取更多文档内容(仅 `full` 模式声明)
  */
 export const allChatClientSideTools = {
   insertBlock: tool({
     description: 'Insert a new block at the specified position relative to a reference block',
     inputSchema: insertBlockToolInputSchema,
-    execute: async () => ({ ok: true as const }),
   }),
   updateBlock: tool({
     description: 'Update an existing block by its target block ID',
     inputSchema: updateBlockToolInputSchema,
-    execute: async () => ({ ok: true as const }),
   }),
   deleteBlock: tool({
     description: 'Delete an existing block by its target block ID',
     inputSchema: deleteBlockToolInputSchema,
-    execute: async () => ({ ok: true as const }),
   }),
   replaceBlocks: tool({
     description: 'Replace one or more existing blocks with new blocks',
     inputSchema: replaceBlocksToolInputSchema,
-    execute: async () => ({ ok: true as const }),
   }),
   moveBlock: tool({
     description: 'Move an existing block to a position relative to a reference block',
     inputSchema: moveBlockToolInputSchema,
-    execute: async () => ({ ok: true as const }),
+  }),
+  replaceText: tool({
+    description:
+      'Replace a range of text within a single block. Provide from/to as zero-based character offsets into the block plain text (including from, excluding to) and expectedText (the exact current text in that range) for verification before replacing.',
+    inputSchema: replaceTextToolInputSchema,
+  }),
+  searchDocument: tool({
+    description:
+      'Search the document for text (substring, or regex when isRegex=true) and return matching blocks with blockId, from/to offsets and matchedText. Use this to locate text BEFORE calling replaceText. Read-only; available in all context modes.',
+    inputSchema: searchDocumentToolInputSchema,
   }),
   getDocumentSnapshot: tool({
     description: 'Read more of the document on demand, with block and token limits',
     inputSchema: getDocumentSnapshotToolInputSchema,
-    execute: async () => ({ ok: true as const }),
   }),
 }
 
@@ -112,9 +122,11 @@ export async function streamChat(
   // 根据 contextMode 过滤 tools(只在 full 模式声明 getDocumentSnapshot)
   const tools = getChatClientSideTools(req.contextMode)
 
-  // 调用 streamText(声明 client-side tools 不 execute)
+  // 调用 streamText(声明 client-side tools 不 execute;system 约束必须调用工具才能改文档)
+  // toolChoice 保持 auto:对话也支持纯问答,不强制工具调用。
   const result = streamText({
     model: resolveModel(req.model),
+    system: CHAT_SYSTEM_PROMPT,
     messages: modelMessages,
     tools,
     onFinish: ({ usage, finishReason }) => {
