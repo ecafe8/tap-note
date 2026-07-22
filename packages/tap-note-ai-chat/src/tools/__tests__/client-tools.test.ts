@@ -78,7 +78,6 @@ function createMockEditor(opts: {
 function makeCtx(opts: {
   blocks?: Array<{ id?: string; type?: string; content?: unknown }>
   revision?: number
-  contextMode?: 'selection' | 'full' | 'none'
   allowSnapshotTool?: boolean
 }): ExecuteClientToolContext & { calls: { method: string; args: unknown[] }[] } {
   const { editor, documentStateBuilder, calls } = createMockEditor({
@@ -88,7 +87,6 @@ function makeCtx(opts: {
   return {
     editor,
     documentStateBuilder,
-    contextMode: opts.contextMode ?? 'none',
     allowSnapshotTool: opts.allowSnapshotTool ?? true,
     calls,
   }
@@ -234,10 +232,9 @@ describe('executeClientTool: moveBlock', () => {
 })
 
 describe('executeClientTool: getDocumentSnapshot', () => {
-  test('contextMode=full + allowSnapshotTool=true 才执行', async () => {
+  test('allowSnapshotTool=true 时执行', async () => {
     const ctx = makeCtx({
       revision: 1,
-      contextMode: 'full',
       allowSnapshotTool: true,
       blocks: Array.from({ length: 20 }, (_, i) => ({ id: `b${i}`, type: 'paragraph', content: `block ${i}` })),
     })
@@ -250,20 +247,9 @@ describe('executeClientTool: getDocumentSnapshot', () => {
     expect(result.snapshot.blocks.length).toBeLessThanOrEqual(5)
   })
 
-  test('contextMode=none 拒绝执行', async () => {
-    const ctx = makeCtx({
-      revision: 1,
-      contextMode: 'none',
-      allowSnapshotTool: true,
-    })
-    const result = await executeClientTool('getDocumentSnapshot', {}, ctx)
-    expect(result).toMatchObject({ kind: 'conflict', reason: 'precondition-failed' })
-  })
-
   test('allowSnapshotTool=false 拒绝执行', async () => {
     const ctx = makeCtx({
       revision: 1,
-      contextMode: 'full',
       allowSnapshotTool: false,
     })
     const result = await executeClientTool('getDocumentSnapshot', {}, ctx)
@@ -273,7 +259,6 @@ describe('executeClientTool: getDocumentSnapshot', () => {
   test('超 maxBlocks 截断 truncated=true', async () => {
     const ctx = makeCtx({
       revision: 1,
-      contextMode: 'full',
       blocks: Array.from({ length: 20 }, (_, i) => ({ id: `b${i}`, type: 'paragraph', content: `block ${i}` })),
     })
     const result = await executeClientTool('getDocumentSnapshot', { maxBlocks: 3 }, ctx) as { ok: true; snapshot: { truncated: boolean; includedBlocks: number } }
@@ -285,7 +270,6 @@ describe('executeClientTool: getDocumentSnapshot', () => {
   test('fromBlock 不存在返回冲突', async () => {
     const ctx = makeCtx({
       revision: 1,
-      contextMode: 'full',
       blocks: [{ id: 'b1', type: 'paragraph', content: 'x' }],
     })
     const result = await executeClientTool('getDocumentSnapshot', { fromBlock: 'missing' }, ctx)

@@ -96,6 +96,17 @@ describe('injectDocumentStateMessages', () => {
     expect(combinedText).toContain('b-1')
   })
 
+  test('注入提醒禁止向用户暴露内部文档状态', () => {
+    const messages = [makeUserMessage('u-1', 'hi')]
+    const result = injectDocumentStateMessages(messages, makeDocumentState())
+    const text = result
+      .flatMap((message) => message.parts)
+      .map((part) => ('text' in part ? part.text : ''))
+      .join('\n')
+    expect(text).toContain('PRIVATE INTERNAL CONTEXT')
+    expect(text).toContain('Never include its JSON')
+  })
+
   test('多个 user 消息时,每个 user 消息前都注入', () => {
     const messages = [
       makeAssistantMessage('a-1', 'hello'),

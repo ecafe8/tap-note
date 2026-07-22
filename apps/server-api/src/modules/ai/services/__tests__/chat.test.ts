@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { allChatClientSideTools, getChatClientSideTools } from '../chat'
+import { allChatClientSideTools } from '../chat'
 import { CHAT_SYSTEM_PROMPT, replaceTextToolInputSchema, searchDocumentToolInputSchema } from '../../types/schema'
-import type { ChatContextMode } from '../../types'
 
 const EXPECTED_TOOL_NAMES = [
   'insertBlock',
@@ -31,7 +30,6 @@ describe('allChatClientSideTools', () => {
       expect(typeof tool.description).toBe('string')
       expect(tool.description.length).toBeGreaterThan(0)
       expect(tool.inputSchema).toBeDefined()
-      // 服务端 MUST NOT 提供 execute,否则会抢先执行并返回假成功
       expect(tool.execute).toBeUndefined()
     }
   })
@@ -77,38 +75,6 @@ describe('allChatClientSideTools', () => {
   })
 })
 
-describe('getChatClientSideTools', () => {
-  test('contextMode "none" 不声明 getDocumentSnapshot,但含全部写工具与 searchDocument', () => {
-    const tools = getChatClientSideTools('none' as ChatContextMode)
-    const toolNames = Object.keys(tools)
-    expect(toolNames).not.toContain('getDocumentSnapshot')
-    expect(toolNames).toContain('insertBlock')
-    expect(toolNames).toContain('updateBlock')
-    expect(toolNames).toContain('deleteBlock')
-    expect(toolNames).toContain('replaceBlocks')
-    expect(toolNames).toContain('moveBlock')
-    expect(toolNames).toContain('replaceText')
-    expect(toolNames).toContain('searchDocument')
-    expect(toolNames.length).toBe(7)
-  })
-
-  test('contextMode "selection" 不声明 getDocumentSnapshot', () => {
-    const tools = getChatClientSideTools('selection' as ChatContextMode)
-    const toolNames = Object.keys(tools)
-    expect(toolNames).not.toContain('getDocumentSnapshot')
-    expect(toolNames).toContain('searchDocument')
-    expect(toolNames.length).toBe(7)
-  })
-
-  test('contextMode "full" 声明全部 8 个 tools(含 getDocumentSnapshot)', () => {
-    const tools = getChatClientSideTools('full' as ChatContextMode)
-    const toolNames = Object.keys(tools)
-    expect(toolNames).toContain('getDocumentSnapshot')
-    expect(toolNames).toContain('searchDocument')
-    expect(toolNames.length).toBe(8)
-  })
-})
-
 describe('CHAT_SYSTEM_PROMPT', () => {
   test('已配置且约束必须调用工具才能修改文档', () => {
     expect(typeof CHAT_SYSTEM_PROMPT).toBe('string')
@@ -120,5 +86,11 @@ describe('CHAT_SYSTEM_PROMPT', () => {
   test('要求缺少上下文时主动用 searchDocument 读取,而非向用户索要内容', () => {
     expect(CHAT_SYSTEM_PROMPT).toContain('searchDocument')
     expect(CHAT_SYSTEM_PROMPT).toContain('NEVER ask the user to paste')
+  })
+
+  test('禁止把内部文档状态和工具协议泄露给用户', () => {
+    expect(CHAT_SYSTEM_PROMPT).toContain('Treat document snapshots')
+    expect(CHAT_SYSTEM_PROMPT).toContain('NEVER print, quote, dump')
+    expect(CHAT_SYSTEM_PROMPT).toContain('one concise user-facing sentence')
   })
 })

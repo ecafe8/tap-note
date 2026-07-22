@@ -29,8 +29,6 @@ export { TapNoteChatPanel } from './tap-note-chat-panel'
 export type { TapNoteChatPanelProps } from './tap-note-chat-panel'
 
 // UI 子组件(供集成方覆盖)
-export { ContextSelector } from './ui/context-selector'
-export type { ContextSelectorProps } from './ui/context-selector'
 export { MessageList } from './ui/message-list'
 export type { MessageListProps } from './ui/message-list'
 export { MessageBubble } from './ui/message-bubble'
@@ -55,19 +53,13 @@ export { ToolResultBubble } from './tools/tool-result-bubble'
 export type { ToolResultBubbleProps, ToolResult } from './tools/tool-result-bubble'
 export { findTargetBlockIdFromMessages } from './tools/tool-result-helpers'
 
-// 上下文模式
-export {
-  DEFAULT_CONTEXT_MODE,
-  CONTEXT_MODES,
-  isSnapshotToolAllowed,
-} from './context/context-mode'
-export type { ContextMode } from './context/context-mode'
+// 上下文(自动检测选区/全文)
 export {
   chatLayerContext,
   buildDocumentState,
   getContextHintKey,
 } from './context/context-layer'
-export type { ChatLayeredContext, ContextHintKey } from './context/context-layer'
+export type { ContextHintKey } from './context/context-layer'
 
 // i18n
 export { chatDictionaryZhCN, mergeChatDictionary } from './i18n/zh-cn'

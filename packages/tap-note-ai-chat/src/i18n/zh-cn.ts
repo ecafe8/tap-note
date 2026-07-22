@@ -14,12 +14,6 @@ export interface ChatDictionary extends AICoreDictionary {
   abort: string
   /** 「仅重试该操作」按钮文案(冲突气泡)。 */
   retryToolCall: string
-  /** 「引用选区」segmented 项文案。 */
-  contextSelection: string
-  /** 「引用全文」segmented 项文案。 */
-  contextFull: string
-  /** 「不引用」segmented 项文案。 */
-  contextNone: string
   /** chat 进行中 busy 文案(覆盖 aiBusy 时使用)。 */
   chatBusy: string
   /** 认证过期提示文案。 */
@@ -50,8 +44,6 @@ export interface ChatDictionary extends AICoreDictionary {
   noEditPerformed: string
   /** 选区 chip 文案(`{count}` 为块数量占位符)。 */
   selectionChip: string
-  /** selection 模式但无选区时的提示文案。 */
-  selectionEmptyHint: string
   /** 清除选区按钮 aria-label。 */
   clearSelection: string
 }
@@ -77,9 +69,6 @@ export const chatDictionaryZhCN: ChatDictionary = {
   chatPlaceholder: '输入消息,如「把第二点展开成段落」或「加一个总结小标题」...',
   abort: '中止当前轮',
   retryToolCall: '仅重试该操作',
-  contextSelection: '选区',
-  contextFull: '全文',
-  contextNone: '无',
   chatBusy: '对话 AI 进行中,请等待完成...',
   authExpired: '认证已过期,请重新登录。',
   toolInputting: '输入中',
@@ -95,7 +84,6 @@ export const chatDictionaryZhCN: ChatDictionary = {
   toolSearched: '已查找文档',
   noEditPerformed: '未执行编辑操作',
   selectionChip: '已选 {count} 个块',
-  selectionEmptyHint: '在编辑器中选中文字以引用选区',
   clearSelection: '清除选区',
 }
 

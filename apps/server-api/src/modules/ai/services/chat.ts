@@ -5,7 +5,6 @@ import { logger } from '../../../utils/logger'
 import { resolveModel } from './resolve-model'
 import { ContextTooLargeError } from '../../../errors'
 import type { ChatRequest } from '../types'
-import type { ChatContextMode } from '../types/schema'
 import {
   CHAT_SYSTEM_PROMPT,
   insertBlockToolInputSchema,
@@ -33,8 +32,8 @@ import {
  * - `replaceBlocks` — 替换多个块
  * - `moveBlock` — 移动块
  * - `replaceText` — 替换块内文本范围(compare-and-swap)
- * - `searchDocument` — 按文本搜索文档,返回块 ID 与偏移(只读,所有模式可用)
- * - `getDocumentSnapshot` — 按需读取更多文档内容(仅 `full` 模式声明)
+ * - `searchDocument` — 按文本搜索文档,返回块 ID 与偏移(只读)
+ * - `getDocumentSnapshot` — 按需读取更多文档内容
  */
 export const allChatClientSideTools = {
   insertBlock: tool({
@@ -75,28 +74,10 @@ export const allChatClientSideTools = {
 }
 
 /**
- * 根据上下文模式过滤 client-side tools 声明。
- *
- * - `none` / `selection`:不声明 `getDocumentSnapshot`(LLM 不可见)
- * - `full`:声明全部 6 个 tools
- *
- * 防止 LLM 在不引用或选区模式下尝试读取全文,造成无意义重试。
- */
-export function getChatClientSideTools(contextMode: ChatContextMode): Record<string, typeof allChatClientSideTools[keyof typeof allChatClientSideTools]> {
-  if (contextMode === 'full') {
-    return allChatClientSideTools
-  }
-  // 排除 getDocumentSnapshot,只保留 5 个核心 tools
-  const { getDocumentSnapshot: _, ...rest } = allChatClientSideTools
-  void _
-  return rest
-}
-
-/**
  * 对话 streamText service。
  *
  * 流程:校验 → documentState 体积检查(可选)→ injectDocumentStateMessages(可选)
- * → streamText 声明 client-side tools 不 execute(按 contextMode 过滤)→ toUIMessageStream。
+ * → streamText 声明全部 client-side tools 不 execute → toUIMessageStream。
  */
 export async function streamChat(
   req: ChatRequest,
@@ -111,7 +92,7 @@ export async function streamChat(
     }
   }
 
-  // 注入 documentState(可选,不引用模式不注入)
+  // 注入 documentState(可选)
   const injectedMessages = injectDocumentStateMessages(
     req.messages as never,
     req.documentState,
@@ -120,16 +101,13 @@ export async function streamChat(
   // 转换 UIMessage[] 为 ModelMessage[]
   const modelMessages = await convertToModelMessages(injectedMessages as never)
 
-  // 根据 contextMode 过滤 tools(只在 full 模式声明 getDocumentSnapshot)
-  const tools = getChatClientSideTools(req.contextMode)
-
-  // 调用 streamText(声明 client-side tools 不 execute;system 约束必须调用工具才能改文档)
+  // 调用 streamText(声明全部 client-side tools 不 execute;system 约束必须调用工具才能改文档)
   // toolChoice 保持 auto:对话也支持纯问答,不强制工具调用。
   const result = streamText({
     model: resolveModel(req.model),
     system: CHAT_SYSTEM_PROMPT,
     messages: modelMessages,
-    tools,
+    tools: allChatClientSideTools,
     onFinish: ({ usage, finishReason }) => {
       logger.info(
         {
@@ -138,7 +116,6 @@ export async function streamChat(
           model: req.model,
           usage,
           finishReason,
-          contextMode: req.contextMode,
         },
         'chat streamText finished',
       )

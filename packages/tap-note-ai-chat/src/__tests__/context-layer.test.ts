@@ -20,30 +20,15 @@ describe('buildDocumentState', () => {
     editor = createEditor()
   })
 
-  test('mode=none 返回 undefined', () => {
+  test('无选区时返回全文', () => {
     const builder = createDocumentStateBuilder(editor, { scope: 'selection' })
-    expect(buildDocumentState(editor, 'none', builder)).toBeUndefined()
+    const state = buildDocumentState(editor, builder)
+    expect(state.blocks.length).toBe(3)
+    expect(state.selection).toBeUndefined()
     builder.dispose()
   })
 
-  test('mode=full 返回全文(尊重 mode,而非 builder 固定 scope)', () => {
-    // builder 固定 scope=selection,但 mode=full 应返回全部 3 块
-    const builder = createDocumentStateBuilder(editor, { scope: 'selection' })
-    const state = buildDocumentState(editor, 'full', builder)
-    expect(state?.blocks.length).toBe(3)
-    expect(state?.selection).toBeUndefined()
-    builder.dispose()
-  })
-
-  test('mode=selection 无快照且无实时选区时回退光标块', () => {
-    const builder = createDocumentStateBuilder(editor, { scope: 'selection' })
-    const state = buildDocumentState(editor, 'selection', builder)
-    expect(state).toBeDefined()
-    expect(state?.selection).toBeUndefined()
-    builder.dispose()
-  })
-
-  test('mode=selection 传快照时按快照构建,即使实时选区已折叠', () => {
+  test('有选区快照时按快照构建', () => {
     editor.setSelection('block-1', 'block-2')
     const snapshot = {
       blocks: [
@@ -56,10 +41,17 @@ describe('buildDocumentState', () => {
     }
     editor.setTextCursorPosition('block-3')
     const builder = createDocumentStateBuilder(editor, { scope: 'selection' })
-    const state = buildDocumentState(editor, 'selection', builder, snapshot)
-    expect(state?.blocks.length).toBe(2)
-    expect(state?.selection?.start).toBe('block-1$')
-    expect(state?.selection?.end).toBe('block-2$')
+    const state = buildDocumentState(editor, builder, snapshot)
+    expect(state.blocks.length).toBe(2)
+    expect(state.selection?.start).toBe('block-1$')
+    expect(state.selection?.end).toBe('block-2$')
+    builder.dispose()
+  })
+
+  test('选区快照为空数组时回退全文', () => {
+    const builder = createDocumentStateBuilder(editor, { scope: 'selection' })
+    const state = buildDocumentState(editor, builder, { blocks: [], blockCount: 0 } as never)
+    expect(state.blocks.length).toBe(3)
     builder.dispose()
   })
 })

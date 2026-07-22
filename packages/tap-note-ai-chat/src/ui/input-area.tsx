@@ -20,10 +20,8 @@ export interface InputAreaProps {
   busyReason: string | null
   /** 输入框 ref(用于焦点恢复)。 */
   inputRef?: React.RefObject<HTMLInputElement | null>
-  /** selection 模式下已捕获选区的块数量(undefined 表示无选区或非 selection 模式)。 */
+  /** selection 模式下已捕获选区的块数量(undefined 表示无选区)。 */
   selectionChipBlockCount?: number
-  /** 是否处于 selection 模式(无选区时显示提示)。 */
-  selectionModeActive?: boolean
   /** 清除已捕获选区(chip ✕ 按钮)。 */
   onClearSelection?: () => void
 }
@@ -46,7 +44,6 @@ export const InputArea: FC<InputAreaProps> = ({
   busyReason,
   inputRef,
   selectionChipBlockCount,
-  selectionModeActive,
   onClearSelection,
 }) => {
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -82,10 +79,6 @@ export const InputArea: FC<InputAreaProps> = ({
           >
             ✕
           </button>
-        </div>
-      ) : selectionModeActive ? (
-        <div className="tn-chat-selection-hint" role="status">
-          {dictionary.selectionEmptyHint}
         </div>
       ) : null}
       <input

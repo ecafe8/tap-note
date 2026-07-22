@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore, type FC } from 'react'
+import { useSyncExternalStore, type FC } from 'react'
 import type { BlockNoteEditor } from '@blocknote/core'
 import type {
   AIBusyState,
@@ -10,7 +10,6 @@ import { createDocumentStateBuilder, createSelectionTracker, stripBlockIdSuffix,
 import { TapNoteChatPanel } from './tap-note-chat-panel'
 import type { TapNoteChatPanelProps } from './tap-note-chat-panel'
 import { type ChatDictionary, mergeChatDictionary } from './i18n/zh-cn'
-import { DEFAULT_CONTEXT_MODE, type ContextMode } from './context/context-mode'
 import { chatLayerContext, getContextHintKey, buildDocumentState } from './context/context-layer'
 import { useTapNoteChat } from './use-tap-note-chat'
 import { ToolResultBubble, type ToolResult } from './tools/tool-result-bubble'
@@ -38,9 +37,6 @@ export interface CreateTapNoteChatAssistantOptions {
 
 /**
  * TapNote 对话助手实例(与 `TapNoteEditor.chatAssistant` 接口兼容)。
- *
- * 扩展 `TapNoteChatAssistant` 接口,新增 `panel` 字段返回 `TapNoteChatPanel` 组件引用,
- * 集成方通过 `assistant.panel` 渲染到任意区域(右侧/左侧/浮动/独立路由)。
  */
 export interface TapNoteChatAssistant {
   readonly __brand?: 'TapNoteChatAssistant'
@@ -52,8 +48,6 @@ export interface TapNoteChatAssistant {
   readonly panel: FC<ChatPanelProps>
   /** 字典。 */
   readonly dictionary: ChatDictionary
-  /** 默认 contextMode(集成方可读取后初始化 segmented control)。 */
-  readonly defaultContextMode: ContextMode
 }
 
 /**
@@ -68,12 +62,6 @@ export interface ChatPanelProps {
 
 /**
  * 从 tool-call part 的真实状态/输出派生 `ToolResult`(供 `ToolResultBubble` 渲染)。
- *
- * - `output-available`:真实 output,可能是成功(`ToolSuccessResult`)或结构化冲突(`ConflictResult`)。
- * - `output-error`:未预期异常(如 Zod 校验失败),映射为 `{ kind: 'error', message }`。
- * - 其它(input-streaming/input-available):尚无结果,返回 `undefined`(气泡显示「输入中」)。
- *
- * 绝不从 `output-available` 伪造成功;成功与否完全由真实 output 的形状决定。
  */
 function deriveToolResult(
   p: { state?: string; output?: unknown; errorText?: string },
@@ -91,15 +79,7 @@ function deriveToolResult(
 /**
  * 创建 TapNote 对话助手实例。
  *
- * 最小接入:
- * ```tsx
- * const chatAssistant = createTapNoteChatAssistant({
- *   transport: createServerTransport({ api: '/api/ai/chat', model: 'dashscope:qwen3.7-plus' }),
- *   aiBusyState: busy,
- * })
- * <TapNoteEditor chatAssistant={chatAssistant} aiBusyState={busy} />
- * {chatAssistant.panel && <chatAssistant.panel onClose={() => {}} />}
- * ```
+ * 上下文自动检测:有选区发选区,无选区发全文(受 token 预算截断)。
  */
 export function createTapNoteChatAssistant(
   options: CreateTapNoteChatAssistantOptions,
@@ -108,7 +88,6 @@ export function createTapNoteChatAssistant(
   const modelId = options.model ?? DEFAULT_MODEL_ID
   const allowSnapshotTool = options.allowSnapshotTool ?? true
 
-  // mount 时填充的内部状态(用 mutable ref-like 对象)
   let editorRef: BlockNoteEditor | undefined
   let documentStateBuilderRef: DocumentStateBuilder | undefined = options.documentStateBuilder
   let selectionTrackerRef: SelectionTracker | undefined
@@ -120,8 +99,6 @@ export function createTapNoteChatAssistant(
     const busy = aiBusyStateRef
     const tracker = selectionTrackerRef
 
-    // 在 editor/dsb/busy 未就绪时(集成方未先 mount)渲染占位
-    // 不调用任何 React hook,避免条件渲染 hook 的 lint 错误
     if (!editor || !dsb || !busy) {
       return (
         <div className="tn-chat-panel tn-chat-panel-not-mounted" data-tap-note-chat-panel="" style={{ minWidth: '320px' }}>
@@ -151,26 +128,21 @@ export function createTapNoteChatAssistant(
     toolResultBubbleComponent?: typeof ToolResultBubble
   }) {
     const { editor, documentStateBuilder: dsb, aiBusyState: busy, selectionTracker, onClose, toolResultBubbleComponent } = props
-    const [contextMode, setContextMode] = useState<ContextMode>(DEFAULT_CONTEXT_MODE)
 
-    // 选区快照(响应式):失焦后保留,用于 selection 模式构建与输入区 chip 展示。
     const selectionSnapshot = useSyncExternalStore(
       (cb) => (selectionTracker ? selectionTracker.subscribe(cb) : () => {}),
       () => selectionTracker?.getSnapshot(),
       () => selectionTracker?.getSnapshot(),
     )
 
-    // 计算 layeredContext 与提示(每次 render 重新计算,基于当前 documentState)
-    const documentState = buildDocumentState(editor, contextMode, dsb, selectionSnapshot)
-    const layered = chatLayerContext(documentState, contextMode)
+    const documentState = buildDocumentState(editor, dsb, selectionSnapshot)
+    const layered = chatLayerContext(documentState)
     const hintKey = getContextHintKey(layered)
-    const truncatedMessage = layered.mode !== 'none' && layered.layered.kind === 'truncated'
-      ? layered.layered.message
-      : undefined
-    const tokenInfo = layered.mode !== 'none' && layered.layered.kind === 'full'
-      ? `约 ${layered.layered.estimatedTokens} tokens ✓`
-      : layered.mode !== 'none' && (layered.layered.kind === 'truncated' || layered.layered.kind === 'outline')
-        ? `约 ${layered.layered.estimatedTokens} tokens`
+    const truncatedMessage = layered.kind === 'truncated' ? layered.message : undefined
+    const tokenInfo = layered.kind === 'full'
+      ? `约 ${layered.estimatedTokens} tokens ✓`
+      : (layered.kind === 'truncated' || layered.kind === 'outline')
+        ? `约 ${layered.estimatedTokens} tokens`
         : undefined
 
     const chat = useTapNoteChat({
@@ -182,12 +154,9 @@ export function createTapNoteChatAssistant(
       dictionary,
       aiBusyState: busy,
       allowSnapshotTool,
-      contextMode,
-      onContextModeChange: setContextMode,
       selectionTracker,
     })
 
-    // 渲染消息列表(用户消息 + AI 消息)
     const messageList = chat.messages.map((m: { id?: string; role: string; parts?: Array<{ type?: string; text?: string; state?: string }> }) => {
       if (m.role === 'user') {
         return (
@@ -198,7 +167,6 @@ export function createTapNoteChatAssistant(
           </div>
         )
       }
-      // assistant
       const textParts = m.parts?.filter((p) => p.type === 'text') ?? []
       const streaming = m.parts?.some((p) => p.type === 'tool-call' && p.state === 'input-streaming')
       return (
@@ -211,7 +179,6 @@ export function createTapNoteChatAssistant(
       )
     })
 
-    // 渲染工具结果气泡(基于 messages 中的 tool-call parts,消费真实 tool output)
     const toolResultBubbles = chat.messages.flatMap((m: { parts?: Array<{ type?: string; toolCallId?: string; toolName?: string; input?: unknown; state?: string; output?: unknown; errorText?: string }> }) => {
       const parts = m.parts ?? []
       return parts
@@ -228,12 +195,10 @@ export function createTapNoteChatAssistant(
               result={deriveToolResult(p, dictionary)}
               dictionary={dictionary}
               onRetry={(tcid) => {
-                // 重试用最新 revision 重新 execute:简化实现为重新触发 sendMessage(占位)
                 void tcid
               }}
               onJumpToBlock={(targetId) => {
                 try {
-                  // 跳转前剥离 `$` 协议后缀,使用真实 block ID
                   editor.setTextCursorPosition(stripBlockIdSuffix(targetId) as never)
                 } catch {
                   // 目标块不存在时忽略
@@ -255,15 +220,12 @@ export function createTapNoteChatAssistant(
         isStreaming={chat.status === 'submitted' || chat.status === 'streaming'}
         isBusy={chat.isBusy}
         busyReason={chat.busyReason}
-        contextMode={chat.contextMode}
-        onContextModeChange={chat.setContextMode}
         contextHintKey={hintKey}
         truncatedMessage={truncatedMessage}
         tokenInfo={tokenInfo}
         onClose={onClose}
         toolResultBubbles={toolResultBubbles}
-        selectionChipBlockCount={chat.contextMode === 'selection' && selectionSnapshot ? selectionSnapshot.blockCount : undefined}
-        selectionModeActive={chat.contextMode === 'selection'}
+        selectionChipBlockCount={selectionSnapshot && selectionSnapshot.blocks.length > 0 ? selectionSnapshot.blockCount : undefined}
         onClearSelection={() => selectionTracker?.clear()}
       />
     )
@@ -282,7 +244,6 @@ export function createTapNoteChatAssistant(
     },
     unmount: (editor: BlockNoteEditor) => {
       void editor
-      // 释放 busy(若持有)
       try {
         if (aiBusyStateRef?.isBusy) {
           aiBusyStateRef?.release()
@@ -290,13 +251,11 @@ export function createTapNoteChatAssistant(
       } catch {
         // ignore
       }
-      // 销毁 documentStateBuilder 订阅
       try {
         documentStateBuilderRef?.dispose()
       } catch {
         // editor 已销毁时忽略
       }
-      // 销毁选区跟踪器订阅
       try {
         selectionTrackerRef?.dispose()
       } catch {
@@ -308,7 +267,6 @@ export function createTapNoteChatAssistant(
     },
     panel: ChatPanelComponent,
     dictionary,
-    defaultContextMode: DEFAULT_CONTEXT_MODE,
   }
 
   return assistant

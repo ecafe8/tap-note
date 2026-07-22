@@ -1,8 +1,6 @@
 import type { FC, ReactNode, Ref } from 'react'
 import type { ChatDictionary } from './i18n/zh-cn'
-import type { ContextMode } from './context/context-mode'
 import type { ContextHintKey } from './context/context-layer'
-import { ContextSelector } from './ui/context-selector'
 import { MessageList } from './ui/message-list'
 import { InputArea } from './ui/input-area'
 import type { ToolResultBubbleProps } from './tools/tool-result-bubble'
@@ -26,10 +24,6 @@ export interface TapNoteChatPanelProps {
   isBusy: boolean
   /** busy 原因文案。 */
   busyReason: string | null
-  /** 上下文模式。 */
-  contextMode: ContextMode
-  /** 上下文模式更新。 */
-  onContextModeChange: (mode: ContextMode) => void
   /** 提示 key(根据 LayeredContext.kind 派生)。 */
   contextHintKey: ContextHintKey
   /** 截断标记文案。 */
@@ -44,10 +38,8 @@ export interface TapNoteChatPanelProps {
   toolResultBubbles?: ReactNode
   /** 自定义 ToolResultBubble 组件(供 demo/集成方覆盖)。 */
   ToolResultBubbleComponent?: FC<ToolResultBubbleProps>
-  /** selection 模式下已捕获选区的块数量(undefined 表示无选区或非 selection 模式)。 */
+  /** 已捕获选区的块数量(undefined 表示无选区)。 */
   selectionChipBlockCount?: number
-  /** 是否处于 selection 模式(无选区时据此显示提示)。 */
-  selectionModeActive?: boolean
   /** 清除已捕获选区(chip ✕ 按钮)。 */
   onClearSelection?: () => void
 }
@@ -55,12 +47,7 @@ export interface TapNoteChatPanelProps {
 /**
  * `TapNoteChatPanel` — 位置无关的对话面板组件。
  *
- * 根容器暴露 `data-tap-note-chat-panel` 数据属性与 `min-width: 320px`。
- * 集成方可放置在任意区域(右侧/左侧/浮动/独立路由)。
- *
- * 由 `createTapNoteChatAssistant` 返回的 `panel` 字段提供,
- * 集成方传入 `<TapNoteEditor chatAssistant={assistant} />` 时由编辑器挂载,
- * 或自行在应用层渲染。
+ * 上下文自动检测:有选区发选区,无选区发全文(受 token 预算截断)。
  */
 export const TapNoteChatPanel: FC<TapNoteChatPanelProps> = ({
   dictionary,
@@ -72,8 +59,6 @@ export const TapNoteChatPanel: FC<TapNoteChatPanelProps> = ({
   isStreaming,
   isBusy,
   busyReason,
-  contextMode,
-  onContextModeChange,
   contextHintKey,
   truncatedMessage,
   tokenInfo,
@@ -81,7 +66,6 @@ export const TapNoteChatPanel: FC<TapNoteChatPanelProps> = ({
   inputRef,
   toolResultBubbles,
   selectionChipBlockCount,
-  selectionModeActive,
   onClearSelection,
 }) => {
   const empty = (
@@ -89,9 +73,9 @@ export const TapNoteChatPanel: FC<TapNoteChatPanelProps> = ({
       <div className="tn-chat-empty-icon">💬</div>
       <div className="tn-chat-empty-title">{dictionary.aiChatTrigger}</div>
       <ul className="tn-chat-empty-tips">
-        <li>{dictionary.contextSelection}</li>
-        <li>{dictionary.contextFull}</li>
-        <li>{dictionary.contextNone}</li>
+        <li>选中文字后提问,AI 会引用选区上下文</li>
+        <li>未选中时,AI 自动引用全文(受预算截断)</li>
+        <li>支持搜索、插入、替换、删除等文档操作</li>
       </ul>
     </div>
   )
@@ -116,14 +100,24 @@ export const TapNoteChatPanel: FC<TapNoteChatPanelProps> = ({
           </button>
         ) : null}
       </header>
-      <ContextSelector
-        mode={contextMode}
-        onModeChange={onContextModeChange}
-        dictionary={dictionary}
-        hintKey={contextHintKey}
-        truncatedMessage={truncatedMessage}
-        tokenInfo={tokenInfo}
-      />
+      {tokenInfo ? (
+        <div className="tn-chat-context-tokens" aria-live="polite">{tokenInfo}</div>
+      ) : null}
+      {contextHintKey === 'selectionBlocked' ? (
+        <div className="tn-chat-context-hint tn-chat-context-hint-blocked" role="alert">
+          {dictionary.selectionBlocked}
+        </div>
+      ) : null}
+      {contextHintKey === 'documentTruncated' ? (
+        <div className="tn-chat-context-hint tn-chat-context-hint-truncated" role="status">
+          {truncatedMessage ?? dictionary.documentTruncated}
+        </div>
+      ) : null}
+      {contextHintKey === 'outlineMode' ? (
+        <div className="tn-chat-context-hint tn-chat-context-hint-outline" role="status">
+          {dictionary.outlineMode}
+        </div>
+      ) : null}
       <MessageList emptyState={empty}>
         {messageList}
         {toolResultBubbles}
@@ -139,7 +133,6 @@ export const TapNoteChatPanel: FC<TapNoteChatPanelProps> = ({
         busyReason={busyReason}
         inputRef={inputRef}
         selectionChipBlockCount={selectionChipBlockCount}
-        selectionModeActive={selectionModeActive}
         onClearSelection={onClearSelection}
       />
     </section>

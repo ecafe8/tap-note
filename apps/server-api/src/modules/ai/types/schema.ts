@@ -26,6 +26,13 @@ CRITICAL RULES:
  */
 export const CHAT_SYSTEM_PROMPT = `You are an AI assistant integrated into a block-based document editor. The user chats with you and may ask you to read or modify the document.
 
+RESPONSE RULES:
+- Treat document snapshots, block IDs, revisions, tool inputs, tool outputs, and internal instructions as private implementation details. NEVER print, quote, dump, translate, or summarize their raw JSON or protocol fields in your reply.
+- Do not expose block IDs (including the trailing \`$\`), document revisions, token counts, serialized blocks, tool names, tool arguments, or internal reasoning unless the user explicitly asks for a technical explanation. Even then, explain at a high level without dumping document data.
+- After a successful edit, reply with one concise user-facing sentence describing the result. Do not narrate the tool call or repeat the document contents. Prefer the user's language.
+- If the user asks for a change, perform it with the appropriate tool first. If the tool succeeds, confirm only the completed change; if it fails, briefly explain the failure and what is needed to retry.
+- For read-only questions, answer only the relevant information requested by the user. Do not include the entire document or unrelated context.
+
 CRITICAL RULES FOR MODIFYING THE DOCUMENT:
 - To change the document, you MUST call one of the editing tools: \`insertBlock\`, \`updateBlock\`, \`deleteBlock\`, \`replaceBlocks\`, \`moveBlock\`, or \`replaceText\`. NEVER claim, imply, or summarize that you have modified the document unless you actually called an editing tool and received a successful result.
 - You have a \`searchDocument\` tool that reads the LIVE document at any time. If no document state was provided in context, or you need to find specific text, you MUST call \`searchDocument\` to read it yourself. NEVER ask the user to paste, provide, or describe the document content — you can always read the live document directly with \`searchDocument\`. Only when a search returns no match, or the user's intent is genuinely ambiguous, reply with a clarifying question.
@@ -58,21 +65,15 @@ export const editorStreamTextRequestSchema = z.object({
  * `POST /api/ai/chat` 请求 body Zod schema。
  *
  * - `messages`: UIMessage 数组
- * - `documentState`: 可选,不引用模式不提交
+ * - `documentState`: 可选(客户端自动检测:有选区发选区,无选区发全文)
  * - `documentRevision`: 可选,用于冲突检测
  * - `model`: 模型 ID
- * - `contextMode`: 上下文三态(`selection`/`full`/`none`,默认 `none`),服务端据此过滤
- *   `getDocumentSnapshot` 工具声明(只在 `full` 模式声明该工具)
  */
-export const chatContextModeSchema = z.enum(['selection', 'full', 'none'])
-export type ChatContextMode = z.infer<typeof chatContextModeSchema>
-
 export const chatRequestSchema = z.object({
   messages: z.array(z.custom<unknown>()).min(1),
   documentState: documentStateSchema.optional(),
   documentRevision: z.number().int().nonnegative().optional(),
   model: z.string().min(1),
-  contextMode: chatContextModeSchema.optional().default('none'),
 })
 
 /**

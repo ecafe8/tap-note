@@ -7,7 +7,6 @@ export {
   EDITOR_SYSTEM_PROMPT,
   editorStreamTextRequestSchema,
   chatRequestSchema,
-  chatContextModeSchema,
   serverStreamToolInputSchema,
   insertBlockToolInputSchema,
   updateBlockToolInputSchema,
@@ -21,7 +20,6 @@ export {
 export type {
   EditorStreamTextRequest,
   ChatRequest,
-  ChatContextMode,
   ServerStreamToolInput,
   ModelInfo,
   ModelsResponse,

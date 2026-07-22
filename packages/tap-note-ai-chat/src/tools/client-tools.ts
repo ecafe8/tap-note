@@ -2,7 +2,6 @@ import type { BlockNoteEditor, BlockIdentifier } from '@blocknote/core'
 import type { ConflictResult } from '@tap-note/ai-core'
 import type { DocumentStateBuilder } from '@tap-note/ai-core'
 import { stripBlockIdSuffix, applyReplaceTextToEditor, searchDocument } from '@tap-note/ai-core'
-import type { ContextMode } from '../context/context-mode'
 import {
   insertBlockToolInputSchema,
   updateBlockToolInputSchema,
@@ -22,8 +21,6 @@ export interface ExecuteClientToolContext {
   editor: BlockNoteEditor
   /** ai-core DocumentStateBuilder(提供 `documentRevision` 与 `build()`)。 */
   documentStateBuilder: DocumentStateBuilder
-  /** 当前上下文模式(`none`/`selection`/`full`),用于 `getDocumentSnapshot` 可见性冗余校验。 */
-  contextMode: ContextMode
   /** 集成方是否允许 `getDocumentSnapshot` 工具(默认 `true`)。 */
   allowSnapshotTool: boolean
 }
@@ -328,11 +325,11 @@ async function executeGetDocumentSnapshot(
   ctx: ExecuteClientToolContext,
 ): Promise<ExecuteToolResult | { ok: true; toolName: ChatToolName; currentDocumentRevision: number; snapshot: { blocks: unknown[]; fromBlock?: string; includedBlocks: number; truncated: boolean } }> {
   const parsed = getDocumentSnapshotToolInputSchema.parse(input)
-  // 冗余校验:服务端按 contextMode 过滤,客户端再次确认
-  if (ctx.contextMode !== 'full' || !ctx.allowSnapshotTool) {
+  // 冗余校验:集成方可通过 allowSnapshotTool 禁用此工具
+  if (!ctx.allowSnapshotTool) {
     return makeConflict(
       'precondition-failed',
-      `getDocumentSnapshot not allowed in contextMode=${ctx.contextMode}, allowSnapshotTool=${ctx.allowSnapshotTool}`,
+      `getDocumentSnapshot not allowed (allowSnapshotTool=false)`,
       ctx,
     )
   }

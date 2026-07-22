@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { createTapNoteChatAssistant } from '../create-tap-note-chat-assistant'
 import { createAIBusyState, createServerTransport } from '@tap-note/ai-core'
+import { chatDictionaryZhCN } from '../i18n/zh-cn'
 import type { BlockNoteEditor } from '@blocknote/core'
 
 // Mock editor:不需要真实 BlockNote,只验证入口结构
@@ -21,7 +22,7 @@ function makeTransport() {
 }
 
 describe('createTapNoteChatAssistant', () => {
-  test('返回对象结构正确:含 mount/unmount/panel/dictionary/defaultContextMode', () => {
+  test('返回对象结构正确:含 mount/unmount/panel/dictionary', () => {
     const busy = createAIBusyState()
     const transport = makeTransport()
     const assistant = createTapNoteChatAssistant({ transport, aiBusyState: busy })
@@ -30,7 +31,6 @@ describe('createTapNoteChatAssistant', () => {
     expect(assistant.panel).toBeDefined()
     expect(typeof assistant.panel).toBe('function')
     expect(assistant.dictionary).toBeDefined()
-    expect(assistant.defaultContextMode).toBe('none')
     expect(assistant.__brand).toBe('TapNoteChatAssistant')
   })
 
@@ -39,7 +39,7 @@ describe('createTapNoteChatAssistant', () => {
     const transport = makeTransport()
     const assistant = createTapNoteChatAssistant({ transport, aiBusyState: busy })
     expect(assistant.dictionary.chatPlaceholder).toBeDefined()
-    expect(assistant.dictionary.contextNone).toBe('无')
+    expect(assistant.dictionary.chatBusy).toBeDefined()
   })
 
   test('dictionary Partial 覆盖', () => {
@@ -51,8 +51,7 @@ describe('createTapNoteChatAssistant', () => {
       dictionary: { chatPlaceholder: 'Custom' },
     })
     expect(assistant.dictionary.chatPlaceholder).toBe('Custom')
-    // 未覆盖字段保留默认
-    expect(assistant.dictionary.contextNone).toBe('无')
+    expect(assistant.dictionary.chatBusy).toBe(chatDictionaryZhCN.chatBusy)
   })
 
   test('mount/unmount 生命周期', () => {

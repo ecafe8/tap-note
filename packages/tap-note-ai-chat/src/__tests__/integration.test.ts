@@ -6,7 +6,7 @@ import {
   type ConflictResult,
 } from '@tap-note/ai-core'
 import { executeClientTool, type ExecuteClientToolContext } from '../tools/client-tools'
-import { chatLayerContext, buildDocumentState, isSnapshotToolAllowed } from '../context'
+import { chatLayerContext, buildDocumentState } from '../context'
 import type { BlockNoteEditor, BlockIdentifier } from '@blocknote/core'
 import type { DocumentState, DocumentStateBuilder } from '@tap-note/ai-core'
 
@@ -76,7 +76,6 @@ function createMockEditor(blocks: Array<{ id?: string; type?: string; content?: 
 
 function makeCtx(opts: {
   blocks?: Array<{ id?: string; type?: string; content?: unknown }>
-  contextMode?: 'selection' | 'full' | 'none'
   allowSnapshotTool?: boolean
 }): ExecuteClientToolContext & { calls: { method: string; args: unknown[] }[] } {
   const { editor, documentStateBuilder, calls } = createMockEditor(
@@ -88,7 +87,6 @@ function makeCtx(opts: {
   return {
     editor,
     documentStateBuilder,
-    contextMode: opts.contextMode ?? 'none',
     allowSnapshotTool: opts.allowSnapshotTool ?? true,
     calls,
   }
@@ -206,7 +204,7 @@ describe('11.3 ConflictResult 集成', () => {
 
 // ============ 11.4 layerContext 上下文三态 ============
 
-describe('11.4 layerContext 上下文三态集成', () => {
+describe('11.4 layerContext 上下文预算集成', () => {
   test('selection 超 4K 拦截', () => {
     const largeSelection: DocumentState = {
       format: 'blocks-json',
@@ -215,92 +213,64 @@ describe('11.4 layerContext 上下文三态集成', () => {
       blocks: [{ type: 'paragraph', content: 'x'.repeat(20000) }] as DocumentState['blocks'],
       selection: { start: 'b1', end: 'b1' },
     }
-    const layered = chatLayerContext(largeSelection, 'selection')
-    expect(layered.mode).toBe('selection')
-    if (layered.mode !== 'none') {
-      expect(layered.layered.kind).toBe('selection-blocked')
-    }
+    const layered = chatLayerContext(largeSelection)
+    expect(layered.kind).toBe('selection-blocked')
   })
 
-  test('full 预算内发完整', () => {
+  test('预算内发完整', () => {
     const smallFull: DocumentState = {
       format: 'blocks-json',
       schemaVersion: '1.0.0',
       documentRevision: 1,
       blocks: [{ type: 'paragraph', content: 'hello' }] as DocumentState['blocks'],
     }
-    const layered = chatLayerContext(smallFull, 'full')
-    expect(layered.mode).toBe('full')
-    if (layered.mode !== 'none') {
-      expect(layered.layered.kind).toBe('full')
-    }
+    const layered = chatLayerContext(smallFull)
+    expect(layered.kind).toBe('full')
   })
 
-  test('full 超预算截断', () => {
+  test('超预算截断', () => {
     const midFull: DocumentState = {
       format: 'blocks-json',
       schemaVersion: '1.0.0',
       documentRevision: 1,
       blocks: [{ type: 'paragraph', content: 'x'.repeat(44000) }] as DocumentState['blocks'],
     }
-    const layered = chatLayerContext(midFull, 'full')
-    expect(layered.mode).toBe('full')
-    if (layered.mode !== 'none') {
-      expect(layered.layered.kind).toBe('truncated')
-    }
+    const layered = chatLayerContext(midFull)
+    expect(layered.kind).toBe('truncated')
   })
 
-  test('full >2× 改发大纲', () => {
+  test('>2× 改发大纲', () => {
     const hugeFull: DocumentState = {
       format: 'blocks-json',
       schemaVersion: '1.0.0',
       documentRevision: 1,
       blocks: [{ type: 'paragraph', content: 'x'.repeat(80000) }] as DocumentState['blocks'],
     }
-    const layered = chatLayerContext(hugeFull, 'full')
-    expect(layered.mode).toBe('full')
-    if (layered.mode !== 'none') {
-      expect(layered.layered.kind).toBe('outline')
-    }
-  })
-
-  test('none 不发 documentState', () => {
-    const layered = chatLayerContext(undefined, 'none')
-    expect(layered.mode).toBe('none')
-    expect(layered.documentState).toBeUndefined()
-  })
-
-  test('none 模式不暴露 snapshot tool', () => {
-    expect(isSnapshotToolAllowed('none', true)).toBe(false)
-    expect(isSnapshotToolAllowed('selection', true)).toBe(false)
-    expect(isSnapshotToolAllowed('full', true)).toBe(true)
+    const layered = chatLayerContext(hugeFull)
+    expect(layered.kind).toBe('outline')
   })
 })
 
 // ============ 11.5 选区高亮 + chip 集成(简化) ============
 
-describe('11.5 选区高亮 + chip 集成(简化)', () => {
-  test('selection 模式 buildDocumentState 调用 documentStateBuilder.build()', () => {
-    const blocks = [{ id: 'b1', type: 'paragraph', content: 'sel' }]
-    const { editor, documentStateBuilder } = createMockEditor(blocks)
-    const ds = buildDocumentState(editor, 'selection', documentStateBuilder)
-    expect(ds).toBeDefined()
-    // ds.blocks 应该来自 documentStateBuilder.build()
-    expect(ds?.blocks.length).toBeGreaterThan(0)
-  })
-
-  test('none 模式 buildDocumentState 返回 undefined', () => {
-    const blocks = [{ id: 'b1', type: 'paragraph', content: 'sel' }]
-    const { editor, documentStateBuilder } = createMockEditor(blocks)
-    const ds = buildDocumentState(editor, 'none', documentStateBuilder)
-    expect(ds).toBeUndefined()
-  })
-
-  test('full 模式 buildDocumentState 调用 documentStateBuilder.build()', () => {
+describe('11.5 buildDocumentState 自动检测', () => {
+  test('无选区时 buildDocumentState 返回全文', () => {
     const blocks = [{ id: 'b1', type: 'paragraph', content: 'full' }]
     const { editor, documentStateBuilder } = createMockEditor(blocks)
-    const ds = buildDocumentState(editor, 'full', documentStateBuilder)
+    const ds = buildDocumentState(editor, documentStateBuilder)
     expect(ds).toBeDefined()
+    expect(ds.blocks.length).toBeGreaterThan(0)
+  })
+
+  test('有选区快照时 buildDocumentState 返回选区', () => {
+    const blocks = [{ id: 'b1', type: 'paragraph', content: 'sel' }]
+    const { editor, documentStateBuilder } = createMockEditor(blocks)
+    const ds = buildDocumentState(editor, documentStateBuilder, {
+      blocks: blocks as never,
+      blockCount: 1,
+    })
+    expect(ds).toBeDefined()
+    expect(ds.blocks.length).toBeGreaterThan(0)
   })
 })
 

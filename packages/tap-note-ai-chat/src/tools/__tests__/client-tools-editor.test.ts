@@ -28,7 +28,6 @@ function makeCtx(editor: BlockNoteEditor): ExecuteClientToolContext & { dsb: Doc
   return {
     editor,
     documentStateBuilder: dsb,
-    contextMode: 'none',
     allowSnapshotTool: true,
     dsb,
   }
