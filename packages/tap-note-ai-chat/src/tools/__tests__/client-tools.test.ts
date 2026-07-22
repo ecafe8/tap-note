@@ -103,8 +103,35 @@ describe('executeClientTool: insertBlock', () => {
       position: 'after',
       baseDocumentRevision: 5,
     }, ctx)
-    expect(result).toEqual({ ok: true, toolName: 'insertBlock', currentDocumentRevision: 5, targetBlockId: 'b2' })
+    expect(result).toEqual({
+      ok: true,
+      toolName: 'insertBlock',
+      currentDocumentRevision: 5,
+      targetBlockId: 'b2',
+      referenceBlockId: 'b2',
+      position: 'after',
+      documentOrder: ['b1$', 'b2$', 'b3$'],
+      insertedBlockIds: ['new-id$'],
+    })
     expect(ctx.calls.find((c) => c.method === 'insertBlocks')).toBeDefined()
+  })
+
+  test('appendToDocument 使用最后一个顶层块而不是上下文中的首个块', async () => {
+    const ctx = makeCtx({ revision: 5 })
+    const result = await executeClientTool('insertBlock', {
+      block: { type: 'paragraph', content: 'appended' },
+      referenceBlockId: 'b1',
+      position: 'after',
+      appendToDocument: true,
+      baseDocumentRevision: 5,
+    }, ctx)
+    expect(result).toMatchObject({
+      ok: true,
+      targetBlockId: 'b3$',
+      referenceBlockId: 'b3$',
+      position: 'after',
+    })
+    expect(ctx.calls.find((c) => c.method === 'insertBlocks')?.args[1]).toBe('b3')
   })
 
   test('revision 冲突返回 ConflictResult', async () => {

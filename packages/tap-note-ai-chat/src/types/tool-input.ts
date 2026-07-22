@@ -16,6 +16,8 @@ export const insertBlockToolInputSchema = z.object({
   block: blockSchema,
   referenceBlockId: blockIdSchema,
   position: positionSchema.default('after'),
+  /** 续写场景使用文档当前最后一个顶层块,避免模型选中上下文中的首个块。 */
+  appendToDocument: z.boolean().optional(),
   baseDocumentRevision: baseDocumentRevisionSchema,
 })
 
@@ -88,6 +90,13 @@ export interface ToolSuccessResult {
   toolName: ChatToolName
   currentDocumentRevision: number
   targetBlockId?: string
+  /** insertBlock 的实际参考块与位置。 */
+  referenceBlockId?: string
+  position?: 'before' | 'after'
+  /** insertBlock 执行后的顶层块顺序,用于模型确认是否真的写在文末。 */
+  documentOrder?: string[]
+  /** insertBlock 实际创建的块 ID。 */
+  insertedBlockIds?: string[]
   replacedText?: string
   matches?: unknown[]
   truncated?: boolean

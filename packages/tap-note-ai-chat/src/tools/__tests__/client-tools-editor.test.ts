@@ -96,6 +96,31 @@ describe('executeClientTool: block 操作带 $ ID(真实 editor)', () => {
     expect(result).toMatchObject({ ok: true, toolName: 'updateBlock', targetBlockId: 'b1$' })
     expect(textOf(editor, 'b1')).toBe('changed')
   })
+
+  test('appendToDocument 将新块插入真实文档末尾', async () => {
+    const editor = createEditor([
+      { type: 'paragraph', id: 'b1', content: 'first' },
+      { type: 'paragraph', id: 'b2', content: 'last' },
+    ])
+    const ctx = makeCtx(editor)
+    const result = await executeClientTool(
+      'insertBlock',
+      {
+        block: { type: 'paragraph', content: 'appended' },
+        referenceBlockId: 'b1$',
+        position: 'after',
+        appendToDocument: true,
+        baseDocumentRevision: 0,
+      },
+      ctx,
+    )
+    expect(result).toMatchObject({ ok: true, targetBlockId: 'b2$', position: 'after' })
+    expect(editor.document.map((block) => block.id)).toEqual([
+      'b1',
+      'b2',
+      result.ok ? result.insertedBlockIds?.[0]?.replace(/\$$/, '') : undefined,
+    ])
+  })
 })
 
 describe('executeClientTool: slash → 斜线 端到端', () => {

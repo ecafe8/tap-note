@@ -108,6 +108,17 @@ function blockExists(targetBlockId: string, ctx: ExecuteClientToolContext): bool
   }
 }
 
+function getTopLevelDocumentOrder(ctx: ExecuteClientToolContext): string[] {
+  return ctx.editor.document
+    .map((block) => block.id)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    .map(toProtocolBlockId)
+}
+
+function toProtocolBlockId(id: string): string {
+  return id.endsWith('$') ? id : `${id}$`
+}
+
 async function executeInsertBlock(
   input: unknown,
   ctx: ExecuteClientToolContext,
@@ -122,24 +133,38 @@ async function executeInsertBlock(
       { type: 'insertBlock', ...parsed },
     )
   }
-  if (!blockExists(parsed.referenceBlockId, ctx)) {
+  const documentOrderBeforeInsert = getTopLevelDocumentOrder(ctx)
+  const resolvedReferenceBlockId = parsed.appendToDocument
+    ? documentOrderBeforeInsert.at(-1)
+    : parsed.referenceBlockId
+  if (!resolvedReferenceBlockId) {
+    return makeConflict('precondition-failed', 'Cannot append to an empty document', ctx, { type: 'insertBlock', ...parsed })
+  }
+  if (!blockExists(resolvedReferenceBlockId, ctx)) {
     return makeConflict(
       'precondition-failed',
-      `Reference block ${parsed.referenceBlockId} not found`,
+      `Reference block ${resolvedReferenceBlockId} not found`,
       ctx,
-      { type: 'insertBlock', ...parsed },
+      { type: 'insertBlock', ...parsed, referenceBlockId: resolvedReferenceBlockId },
     )
   }
-  ctx.editor.insertBlocks(
+  const insertedBlocks = ctx.editor.insertBlocks(
     [parsed.block],
-    stripBlockIdSuffix(parsed.referenceBlockId) as BlockIdentifier,
+    stripBlockIdSuffix(resolvedReferenceBlockId) as BlockIdentifier,
     parsed.position,
-  )
+  ) as unknown as Array<{ id?: string }>
   return {
     ok: true,
     toolName: 'insertBlock',
     currentDocumentRevision: getCurrentRevision(ctx),
-    targetBlockId: parsed.referenceBlockId,
+    targetBlockId: parsed.appendToDocument ? toProtocolBlockId(resolvedReferenceBlockId) : resolvedReferenceBlockId,
+    referenceBlockId: parsed.appendToDocument ? toProtocolBlockId(resolvedReferenceBlockId) : resolvedReferenceBlockId,
+    position: parsed.position,
+    documentOrder: getTopLevelDocumentOrder(ctx),
+    insertedBlockIds: insertedBlocks
+      .map((block) => block?.id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0)
+      .map(toProtocolBlockId),
   }
 }
 

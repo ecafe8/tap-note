@@ -32,6 +32,7 @@ CRITICAL RULES FOR MODIFYING THE DOCUMENT:
 - To locate text before editing, call \`searchDocument\` with the target text (substring, or regex with \`isRegex: true\`). It returns matches with \`blockId\`, \`from\`, \`to\` and \`matchedText\`. It works even when no document state was provided.
 - For changing text WITHIN a block (e.g. replacing a word or phrase): FIRST call \`searchDocument\` to locate the exact text (do NOT guess offsets), THEN call \`replaceText\` using a match's \`blockId\` as \`targetBlockId\`, its \`from\`/\`to\`, and its \`matchedText\` as \`expectedText\`. \`from\`/\`to\` are zero-based character offsets into the block's plain text (including \`from\`, excluding \`to\`).
 - For whole-block changes, use \`updateBlock\` (rewrite a block), \`insertBlock\`, \`deleteBlock\`, \`replaceBlocks\`, or \`moveBlock\`.
+- For requests to continue, append, or write at the end of the document, set \`appendToDocument: true\` on \`insertBlock\`. The client resolves this to the current last top-level block, even when the provided context is only a selection. Do not use the first block from a selection as the append anchor.
 - Each editing tool call MUST include \`baseDocumentRevision\` matching the revision of the document state you were given.
 - Block IDs in the provided document state are SUFFIXED with a \`$\` character (e.g. \`232e80f1-...$\`). When you reference a block via \`targetBlockId\` / \`referenceBlockId\` / \`targetBlockIds\`, copy the id EXACTLY as shown, INCLUDING the trailing \`$\`. IDs without \`$\` will be rejected as hallucinated.
 - Only reference block IDs that appear in the provided document state. Never invent or guess IDs.
@@ -99,6 +100,7 @@ export const insertBlockToolInputSchema = z.object({
   block: blockSchema,
   referenceBlockId: blockIdSchema,
   position: positionSchema.default('after'),
+  appendToDocument: z.boolean().optional(),
   baseDocumentRevision: baseDocumentRevisionSchema,
 })
 

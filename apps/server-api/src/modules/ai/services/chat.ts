@@ -38,7 +38,8 @@ import {
  */
 export const allChatClientSideTools = {
   insertBlock: tool({
-    description: 'Insert a new block at the specified position relative to a reference block',
+    description:
+      'Insert a new block relative to a reference block. For continue/append/write-at-the-end requests, set appendToDocument=true so the client resolves the current last top-level block instead of using a selection anchor.',
     inputSchema: insertBlockToolInputSchema,
   }),
   updateBlock: tool({

@@ -224,6 +224,8 @@ export function useTapNoteChat(options: UseTapNoteChatOptions): UseTapNoteChatRe
           headers: getAuthHeaders?.(),
         },
       )
+      // 清除已成功提交到 chat 的消息;busy 状态仍由当前 AI 轮次控制输入框。
+      setInputValue('')
     },
     [aiBusyState, editor, contextModeState, documentStateBuilder, model, getAuthHeaders, chat, selectionTracker],
   )
