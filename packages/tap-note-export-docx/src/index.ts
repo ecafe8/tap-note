@@ -1,0 +1,7 @@
+export { TapNoteDocxExporter, createDocxExporter } from "./docx-exporter"
+export type { DocxExporterOptions } from "./docx-exporter"
+export { docxStyleMapping } from "./mappings/styles"
+export { createInlineContentMapping } from "./mappings/inline-content"
+export { createBlockMapping, createUnknownBlockHandler } from "./mappings/blocks"
+export { createNumberingConfig } from "./numbering"
+export { buildDefaultStyles, getFontForBlock } from "./font"

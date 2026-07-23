@@ -12,6 +12,7 @@ import { Sidemenu } from '@/components/sidemenu'
 import { EditorPaperLayout } from '@/components/editor-paper-layout'
 import { ChatDrawer } from '@/components/chat-drawer'
 import { ModelSelector } from '@/components/model-selector'
+import { ExportButton } from '@/components/export-button'
 
 import './app.css'
 
@@ -181,6 +182,7 @@ function EditorPane({ showInline, showChat, actions, inlineAssistant, chatAssist
             </Button>
           ) : null}
           {actions}
+          <ExportButton blocks={blocks} />
           <Button size="sm" onClick={() => console.log(blocks)}>打印 blocks</Button>
           <span style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>BlockNote · {resolvedTheme}</span>
         </div>

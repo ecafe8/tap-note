@@ -1,0 +1,28 @@
+{
+  "name": "@tap-note/export-core",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "description": "TapNote 文档导出共享契约层：ExportInput/ExportResult/ResourceResolver/FontConfig/UnknownBlockPolicy/ExportWarning/ExportError，格式无关。",
+  "scripts": {
+    "lint": "eslint",
+    "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@blocknote/core": "0.51.4",
+    "zod": "^3.25.76 || ^4.1.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10",
+    "eslint": "^10",
+    "globals": "^17",
+    "typescript": "~6",
+    "typescript-eslint": "^8"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  }
+}

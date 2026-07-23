@@ -1,0 +1,31 @@
+{
+  "name": "@tap-note/export-docx",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "description": "TapNote DOCX 格式导出器：基于 @blocknote/core Exporter 基类 + docx 库生成 OOXML/DOCX。",
+  "scripts": {
+    "lint": "eslint",
+    "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@blocknote/core": "0.51.4",
+    "@tap-note/export-core": "workspace:*",
+    "docx": "^9.6.1",
+    "image-meta": "^0.2.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10",
+    "@happy-dom/global-registrator": "^18.0.0",
+    "eslint": "^10",
+    "globals": "^17",
+    "typescript": "~6",
+    "typescript-eslint": "^8"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  }
+}

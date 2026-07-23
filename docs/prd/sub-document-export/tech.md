@@ -51,7 +51,98 @@ flowchart LR
 
 备选：把导出放入私有 server-api 可减少浏览器依赖，但违反独立集成目标；单一大包增加格式耦合。选择 core + 独立格式包。
 
-## 6. 风险与待确认
+## 6. 研究闸门结论（FEAT-010 DOCX 导出，2026-07-22）
+
+### 6.1 `docx` 库 API 锁定（Context7 `/dolanmiu/docx`）
+
+- 版本：`docx@^9.6.1`（MIT）。
+- `Packer.toBlob(doc): Promise<Blob>`——浏览器输出。
+- `Packer.toBuffer(doc): Promise<Buffer>`——Node.js 输出，`new Uint8Array(buffer)` 转换。
+- **双运行时原生兼容，不需要 `buffer` polyfill**。Packer 内部检测环境，浏览器用 Blob，Node 用 Buffer。
+- `Document({ sections, numbering, styles, fonts })` 构造。
+- `TextRun({ text, bold, italics, underline, strike, color, font, size, shading })`。
+- `font` 属性支持 `string | IFontAttributesProperties { ascii, cs, eastAsia, hAnsi, hint }`——直接对应 FontConfig 四组字体。
+- `size` 单位为 **half-points**（OOXML 标准）。FontConfig 对外暴露 points，内部 ×2。
+- `ExternalHyperlink({ link, children })`、`ImageRun({ data, transformation: { width, height } })`。
+- `Table({ rows: [TableRow({ children: [TableCell({ children })] })] })`。
+
+### 6.2 Numbering 配置
+
+```typescript
+numbering: {
+  config: [{
+    reference: "bullet-list",
+    levels: Array.from({ length: 9 }, (_, i) => ({
+      level: i,
+      format: LevelFormat.BULLET,
+      text: ["•", "◦", "▪", "•", "◦", "▪", "•", "◦", "▪"][i],
+      alignment: AlignmentType.LEFT,
+      style: { paragraph: { indent: { left: 720 * (i + 1), hanging: 360 } } },
+    })),
+  }, {
+    reference: "numbered-list",
+    levels: Array.from({ length: 9 }, (_, i) => ({
+      level: i,
+      format: LevelFormat.DECIMAL,
+      text: `%${i + 1}.`,
+      alignment: AlignmentType.LEFT,
+      style: { paragraph: { indent: { left: 720 * (i + 1), hanging: 360 } } },
+    })),
+  }],
+}
+```
+
+段落通过 `numbering: { reference: "bullet-list", level: nestingLevel }` 引用。
+
+### 6.3 默认字体 / styles 配置
+
+```typescript
+styles: {
+  default: {
+    document: {
+      run: {
+        font: { ascii: "Calibri", hAnsi: "Calibri", eastAsia: "SimSun", cs: "Arial" },
+        size: 24, // 12pt × 2
+      },
+    },
+  },
+}
+```
+
+Document defaults 等价于 CSS `*` 规则，优先级最低，可被段落/运行级覆盖。
+
+### 6.4 `Exporter` 基类继承要点（`@blocknote/core` MPL-2.0）
+
+- 泛型：`Exporter<B, I, S, RB, RI, RS, TS>`。
+- Constructor：`(_schema, { blockMapping, inlineContentMapping, styleMapping }, options: ExporterOptions)`。
+- `ExporterOptions.colors` **必填**（`typeof COLORS_DEFAULT`），含 9 个命名颜色（gray/brown/orange/yellow/green/blue/purple/pink/red），每个有 `text` 和 `background` hex 值。
+- `ExporterOptions.resolveFileUrl?: (url) => Promise<string | Blob>`——桥接 ResourceResolver 时返回 `new Blob([buffer], { type: mimeType })`。
+- `resolveFile(url)` 返回 `Blob`。
+- `transformStyledText(styledText: StyledText<S>): TS` 是唯一抽象方法。
+- `mapBlock(block, nestingLevel, numberedListIndex, children?)` 分发到 blockMapping。
+- BlockMapping 签名：`(block, exporter, nestingLevel, numberedListIndex?, children?) => RB | Promise<RB>`。
+
+### 6.5 参考实现重写要点（不复制代码）
+
+- `transformBlocks()` 递归：先递归 children（`nestingLevel + 1`），再 `mapBlock(parent, nestingLevel, 0, children)`。
+- 非列表 block 的子段落用 `Tab` TextRun 缩进；列表 block 用 numbering reference + level 缩进。
+- `numberedListIndex` 参数在参考实现中硬编码 `0`（未使用），列表编号由 docx numbering 自动管理。
+- Table：`columnWidths` px→twips（`× 0.75 × 20 = × 15`），支持 colspan/rowspan，header 行/列加粗。
+- 颜色：style mapping 中 `.slice(1)` 去 `#` 前缀。
+- 图片：用 `image-meta` 检测尺寸，失败用默认值。
+
+### 6.6 `image-meta@0.2.2`（MIT）
+
+- 纯 JS 检测图片类型和尺寸，支持 PNG/JPEG/GIF/WebP/BMP/ICO/TIFF/SVG。
+- API：`imageMeta(buffer)` → `{ type, width, height }`。
+- 体积小巧，无原生依赖，浏览器/Node 兼容。
+- **结论：使用 `image-meta` 而非手写 header parser**。
+
+### 6.7 `buffer` polyfill 结论
+
+- **不需要引入 `buffer@^6.0.3`**。`docx` 库 Packer 原生支持浏览器（toBlob）和 Node（toBuffer），不依赖全局 Buffer。
+
+## 7. 风险与待确认
 
 - PDF/DOCX 复杂 block、字体格式和跨运行时行为需建立最小兼容矩阵。
 - 文本/HTML sanitizer、DOCX 模板与字体 embedding API 不得凭当前文档假定，应在实现前再次调研。
