@@ -74,6 +74,16 @@ export function TapNoteEditor(props: TapNoteEditorProps): React.ReactElement {
     }
     : undefined
 
+  useEffect(() => {
+    if (onChange) {
+      try {
+        onChange(editor.topLevelBlocks)
+      } catch (error) {
+        console.warn('[TapNoteEditor] onChange 初始回调失败:', error)
+      }
+    }
+  }, [editor, onChange])
+
   return (
     <div
       data-tap-note-editor=""
