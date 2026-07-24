@@ -18,9 +18,18 @@ const HEADING_FONT_SIZES: Record<number, number> = {
   6: 11,
 }
 
+const HEADING_FONT_WEIGHTS: Record<number, number> = {
+  1: 900,
+  2: 700,
+  3: 700,
+  4: 700,
+  5: 700,
+  6: 700,
+}
+
 const blockStyles = StyleSheet.create({
   paragraph: { marginBottom: 6, fontSize: 12, lineHeight: 1.5 },
-  heading: { fontWeight: "bold", marginBottom: 8, lineHeight: 1.25 },
+  heading: { marginBottom: 8, lineHeight: 1.25 },
   listItem: { flexDirection: "row", marginBottom: 4, fontSize: 12, lineHeight: 1.5 },
   listMarker: { width: 16, textAlign: "right", marginRight: 6 },
   quote: {
@@ -111,7 +120,13 @@ async function renderSingleBlock(
         { key, style: [blockStyles.heading, indent ? { marginLeft: indent } : {}] },
         React.createElement(
           Text,
-          { key: `${key}-t`, style: { fontSize: HEADING_FONT_SIZES[level] } },
+          {
+            key: `${key}-t`,
+            style: {
+              fontSize: HEADING_FONT_SIZES[level],
+              fontWeight: HEADING_FONT_WEIGHTS[level],
+            },
+          },
           ...renderInlineContent(content, `${key}-ic`)
         )
       )

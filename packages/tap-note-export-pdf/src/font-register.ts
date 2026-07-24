@@ -2,6 +2,19 @@ import { Font } from "@react-pdf/renderer"
 import type { FontConfig } from "@tap-note/export-core"
 import { bufferToDataUri } from "./util/image"
 
+export interface FontVariant {
+  src: Uint8Array
+  format?: "ttf" | "otf" | "woff" | "woff2"
+  fontWeight?: number
+  fontStyle?: "normal" | "italic"
+}
+
+export type FontBufferInput = Uint8Array | FontVariant[]
+
+function getFontMimeType(format: FontVariant["format"] = "ttf"): string {
+  return `font/${format}`
+}
+
 export interface FontRegistrationResult {
   warnings: Array<{ code: string; message: string }>
   registeredFamilies: Set<string>
@@ -9,7 +22,7 @@ export interface FontRegistrationResult {
 
 export function registerFonts(
   fontConfig: FontConfig | undefined,
-  fontBuffers: Record<string, Uint8Array> | undefined
+  fontBuffers: Record<string, FontBufferInput> | undefined
 ): FontRegistrationResult {
   const warnings: FontRegistrationResult["warnings"] = []
   const registeredFamilies = new Set<string>()
@@ -26,11 +39,22 @@ export function registerFonts(
   }
 
   for (const family of familiesToRegister) {
-    const buffer = fontBuffers?.[family]
-    if (buffer) {
+    const input = fontBuffers?.[family]
+    if (input) {
       try {
-        const dataUri = bufferToDataUri(buffer, "font/ttf")
-        Font.register({ family, src: dataUri })
+        if (input instanceof Uint8Array) {
+          const dataUri = bufferToDataUri(input, "font/ttf")
+          Font.register({ family, src: dataUri })
+        } else {
+          Font.register({
+            family,
+            fonts: input.map((variant) => ({
+              src: bufferToDataUri(variant.src, getFontMimeType(variant.format)),
+              fontWeight: variant.fontWeight,
+              fontStyle: variant.fontStyle,
+            })),
+          })
+        }
         registeredFamilies.add(family)
       } catch {
         warnings.push({

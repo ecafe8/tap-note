@@ -10,6 +10,7 @@ import type {
 } from "@tap-note/export-core"
 import { renderBlocks } from "./mappings/blocks"
 import { registerFonts, getFontFamily } from "./font-register"
+import type { FontBufferInput } from "./font-register"
 
 const PDF_MIME_TYPE = "application/pdf"
 const DEFAULT_FILE_NAME = "document.pdf"
@@ -24,14 +25,14 @@ const pageStyles = StyleSheet.create({
 
 export interface PdfExporterOptions {
   fontConfig?: FontConfig
-  fontBuffers?: Record<string, Uint8Array>
+  fontBuffers?: Record<string, FontBufferInput>
 }
 
 export class TapNotePdfExporter implements FormatExporter {
   readonly format = "pdf"
 
   private readonly _fontConfig: FontConfig | undefined
-  private readonly _fontBuffers: Record<string, Uint8Array> | undefined
+  private readonly _fontBuffers: Record<string, FontBufferInput> | undefined
   private _fontsRegistered = false
   private _fontWarnings: ExportWarning[] = []
   private _registeredFamilies: Set<string> = new Set()

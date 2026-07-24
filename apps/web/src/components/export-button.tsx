@@ -8,6 +8,30 @@ import { Button } from "@workspace/ui/components/button"
 
 type ExportFormat = "docx" | "pdf"
 
+import type { FontVariant } from "@tap-note/export-pdf"
+
+const FONT_FAMILY = "Noto Sans SC"
+const FONT_URLS = [
+  { url: "/fonts/NotoSansSC-Regular.woff", fontWeight: 400 },
+  { url: "/fonts/NotoSansSC-Bold.woff", fontWeight: 700 },
+  { url: "/fonts/NotoSansSC-Black.woff", fontWeight: 900 },
+] as const
+
+let cachedFontVariants: FontVariant[] | null = null
+
+async function loadFontVariants(): Promise<FontVariant[]> {
+  if (cachedFontVariants) return cachedFontVariants
+  const buffers = await Promise.all(
+    FONT_URLS.map(async ({ url, fontWeight }) => ({
+      src: new Uint8Array(await (await fetch(url)).arrayBuffer()),
+      format: "woff" as const,
+      fontWeight,
+    }))
+  )
+  cachedFontVariants = buffers
+  return cachedFontVariants
+}
+
 interface ExportButtonProps {
   blocks: PartialBlock[] | null
 }
@@ -20,7 +44,14 @@ export const ExportButton: FC<ExportButtonProps> = ({ blocks }) => {
     setExporting(format)
     try {
       const exporter =
-        format === "pdf" ? createPdfExporter() : createDocxExporter()
+        format === "pdf"
+          ? createPdfExporter({
+              fontConfig: {
+                default: { ascii: FONT_FAMILY, eastAsia: FONT_FAMILY },
+              },
+              fontBuffers: { [FONT_FAMILY]: await loadFontVariants() },
+            })
+          : createDocxExporter()
       const input = validateExportInput({
         blocks,
         resolver: createNoopResolver(),
