@@ -59,7 +59,7 @@ export async function streamEditorText(
     system: EDITOR_SYSTEM_PROMPT,
     messages: modelMessages,
     tools: serverStreamTools,
-    toolChoice: 'required',
+    toolChoice: 'auto',
     onFinish: ({ usage, finishReason }) => {
       // 隐私日志:记录 requestId/userId/model/usage/duration/status,不记录正文
       logger.info(
