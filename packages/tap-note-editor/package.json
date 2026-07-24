@@ -12,7 +12,9 @@
   "dependencies": {
     "@blocknote/core": "0.51.4",
     "@blocknote/react": "0.51.4",
-    "@blocknote/shadcn": "0.51.4"
+    "@blocknote/shadcn": "0.51.4",
+    "@floating-ui/react": "^0.27.0",
+    "lucide-react": "^0.525.0"
   },
   "peerDependencies": {
     "react": "^19",

@@ -6,6 +6,8 @@ import {
   mergeDictionary,
 } from './i18n/zh-cn'
 import { useCreateTapNoteEditor } from './use-create-tap-note-editor'
+import { createDefaultAITools } from './formatting-toolbar/ai-tools'
+import { TapNoteFormattingToolbarController } from './formatting-toolbar/tap-note-formatting-toolbar-controller'
 import type { TapNoteAIBusyState, TapNoteEditorProps } from './types'
 
 const noopSubscribe = () => () => {}
@@ -28,6 +30,7 @@ export function TapNoteEditor(props: TapNoteEditorProps): React.ReactElement {
     inlineAssistant,
     chatAssistant,
     aiBusyState,
+    aiTools,
     shadCNComponents,
     dictionary,
   } = props
@@ -42,6 +45,12 @@ export function TapNoteEditor(props: TapNoteEditorProps): React.ReactElement {
     [dictionary],
   )
   const isBusy = useAIBusy(aiBusyState)
+
+  const hasAIContext = !!inlineAssistant?.context
+  const resolvedAITools = useMemo(
+    () => aiTools ?? createDefaultAITools(mergedDictionary),
+    [aiTools, mergedDictionary],
+  )
 
   useEffect(() => {
     if (inlineAssistant?.mount) {
@@ -97,7 +106,17 @@ export function TapNoteEditor(props: TapNoteEditorProps): React.ReactElement {
         theme={theme}
         onChange={handleChange}
         shadCNComponents={shadCNComponents}
-      />
+        formattingToolbar={hasAIContext ? false : undefined}
+      >
+        {hasAIContext && (
+          <TapNoteFormattingToolbarController
+            context={inlineAssistant!.context!}
+            aiBusy={isBusy}
+            dictionary={mergedDictionary}
+            aiTools={resolvedAITools}
+          />
+        )}
+      </BlockNoteView>
     </div>
   )
 }

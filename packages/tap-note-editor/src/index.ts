@@ -51,6 +51,12 @@ export type {
   TapNoteEditorProps,
   /** 内联助手最小挂载接口,来自 FEAT-003。 */
   TapNoteInlineAssistant,
+  /** 内联助手 context 接口,暴露 submit/accept/reject 等方法供工具栏 UI 消费。 */
+  TapNoteInlineAssistantContext,
+  /** AI 内联状态机状态标识。 */
+  AIInlineStatus,
+  /** AI 技能工具项配置。 */
+  AIToolItem,
   /** `useCreateTapNoteEditor` 的 options。 */
   UseCreateTapNoteEditorOptions,
 } from './types'

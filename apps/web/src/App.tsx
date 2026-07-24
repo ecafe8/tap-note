@@ -2,11 +2,10 @@ import { BrowserRouter, Routes, Route, NavLink, useNavigate } from 'react-router
 import { TapNoteEditor } from '@tap-note/editor'
 import type { Block } from '@tap-note/editor'
 import { Button } from '@workspace/ui/components/button'
-import { useEffect, useState, useSyncExternalStore, useMemo, type ReactNode } from 'react'
+import { useEffect, useState, useMemo, type ReactNode } from 'react'
 import { useTheme } from '@/components/theme-provider.tsx'
 import { createAIBusyState, createServerTransport, DEFAULT_MODEL_ID } from '@tap-note/ai-core'
 import { createTapNoteInlineAssistant } from '@tap-note/ai-inline'
-import type { AIInlineStoreState } from '@tap-note/ai-inline'
 import { createTapNoteChatAssistant } from '@tap-note/ai-chat'
 import { Sidemenu } from '@/components/sidemenu'
 import { EditorPaperLayout } from '@/components/editor-paper-layout'
@@ -19,7 +18,7 @@ import './app.css'
 const INITIAL_CONTENT = [
   { type: 'paragraph', content: 'Hello tap-note editor.' },
   { type: 'paragraph', content: '试试 / 唤起 slash 菜单,或拖拽块、缩进、切换格式。' },
-  { type: 'paragraph', content: '点击上方「✨ AI 助手」按钮体验内联 AI(需启动 server-api)。' },
+  { type: 'paragraph', content: '选中文字后点击工具栏中的 AI 按钮体验内联 AI(需启动 server-api)。' },
 ] as const
 
 const aiBusyState = createAIBusyState()
@@ -69,118 +68,21 @@ function ThemeToggleButton() {
   return <Button variant="outline" size="sm" onClick={() => setTheme(next)}>切换主题({theme})</Button>
 }
 
-function useAIInlineState(inlineAssistant: ReturnType<typeof createTapNoteInlineAssistant>): AIInlineStoreState {
-  const ctx = inlineAssistant.context!
-  const store = ctx.store
-  return useSyncExternalStore(
-    (cb: () => void) => store.subscribe(cb as never),
-    () => store.state,
-    () => store.state,
-  )
-}
-
-function AIMenuPanel({ inlineAssistant, onClose }: { inlineAssistant: ReturnType<typeof createTapNoteInlineAssistant>; onClose: () => void }) {
-  const aiState = useAIInlineState(inlineAssistant)
-  const [input, setInput] = useState('')
-  const state = aiState.state
-  const ctx = inlineAssistant.context!
-
-  const handleSubmit = () => {
-    if (!input.trim()) return
-    ctx.submit(input.trim())
-    setInput('')
-  }
-
-  if (state.status === 'user-input') {
-    return (
-      <div className="tn-demo-ai-menu" role="form">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && input.trim()) {
-              e.preventDefault()
-              handleSubmit()
-            }
-            if (e.key === 'Escape') {
-              onClose()
-              setInput('')
-            }
-          }}
-          placeholder="输入指令,如「续写一段」..."
-          autoFocus
-        />
-        <Button size="sm" onClick={handleSubmit}>发送</Button>
-        <Button size="sm" variant="ghost" onClick={() => { onClose(); setInput('') }}>✕</Button>
-      </div>
-    )
-  }
-
-  if (state.status === 'thinking' || state.status === 'ai-writing') {
-    return (
-      <div className="tn-demo-ai-menu" role="status">
-        <span>AI 正在{state.status === 'thinking' ? '思考' : '写作'}...</span>
-        <Button size="sm" variant="destructive" onClick={() => ctx.abort()}>中止</Button>
-      </div>
-    )
-  }
-
-  if (state.status === 'user-reviewing') {
-    return (
-      <div className="tn-demo-ai-menu" role="dialog">
-        <span>AI 完成,请审阅</span>
-        <Button size="sm" onClick={() => { ctx.accept(); onClose() }}>接受</Button>
-        <Button size="sm" variant="outline" onClick={() => { ctx.reject(); onClose() }}>拒绝</Button>
-      </div>
-    )
-  }
-
-  if (state.status === 'error') {
-    return (
-      <div className="tn-demo-ai-menu" role="alert">
-        <span style={{ color: 'var(--destructive)' }}>{state.error}</span>
-        <Button size="sm" onClick={() => ctx.retry()}>重试</Button>
-        <Button size="sm" variant="ghost" onClick={onClose}>关闭</Button>
-      </div>
-    )
-  }
-
-  return null
-}
-
 interface EditorPaneProps {
-  showInline?: boolean
   showChat?: boolean
   actions?: ReactNode
   inlineAssistant: ReturnType<typeof createTapNoteInlineAssistant>
   chatAssistant: ReturnType<typeof createTapNoteChatAssistant>
 }
 
-function EditorPane({ showInline, showChat, actions, inlineAssistant, chatAssistant }: EditorPaneProps) {
+function EditorPane({ showChat, actions, inlineAssistant, chatAssistant }: EditorPaneProps) {
   const [blocks, setBlocks] = useState<Block[] | null>(null)
-  const [menuOpen, setMenuOpen] = useState(false)
   const resolvedTheme = useResolvedTheme()
-
-  const handleClose = () => {
-    inlineAssistant.context!.close()
-    setMenuOpen(false)
-  }
 
   return (
     <div className="tn-demo-editor-pane">
       <header className="tn-demo-editor-header">
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {showInline ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setMenuOpen(true)}
-              disabled={aiBusyState.isBusy && !inlineAssistant.context!.store.state.state ? false : aiBusyState.isBusy}
-            >
-              ✨ AI 助手
-            </Button>
-          ) : null}
           {actions}
           <ExportButton blocks={blocks} />
           <Button size="sm" onClick={() => console.log(blocks)}>打印 blocks</Button>
@@ -197,7 +99,6 @@ function EditorPane({ showInline, showChat, actions, inlineAssistant, chatAssist
           aiBusyState={aiBusyState}
         />
       </main>
-      {showInline && menuOpen ? <AIMenuPanel inlineAssistant={inlineAssistant} onClose={handleClose} /> : null}
     </div>
   )
 }
@@ -217,7 +118,7 @@ function InlineRoute() {
   return (
     <EditorPaperLayout>
       <ModelAndThemeBar model={model} onModelChange={setModel} />
-      <EditorPane showInline inlineAssistant={inlineAssistant} chatAssistant={chatAssistant} />
+      <EditorPane inlineAssistant={inlineAssistant} chatAssistant={chatAssistant} />
     </EditorPaperLayout>
   )
 }
@@ -249,7 +150,6 @@ function BothRoute() {
     <EditorPaperLayout>
       <ModelAndThemeBar model={model} onModelChange={setModel} />
       <EditorPane
-        showInline
         showChat
         inlineAssistant={inlineAssistant}
         chatAssistant={chatAssistant}

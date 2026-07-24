@@ -1,11 +1,35 @@
+import type { ComponentType } from 'react'
 import type { Block, BlockNoteEditor, PartialBlock, ExtensionFactoryInstance } from '@blocknote/core'
 import type { ShadCNComponents } from '@blocknote/shadcn'
 import type { TapNoteDictionary } from './i18n/zh-cn'
+
+export type AIInlineStatus = 'user-input' | 'thinking' | 'ai-writing' | 'user-reviewing' | 'error'
+
+export interface TapNoteInlineAssistantContext {
+  submit: (prompt: string) => void
+  accept: () => void
+  reject: () => void
+  abort: () => void
+  retry: () => void
+  close: () => void
+  store: {
+    state: { state: { status: AIInlineStatus; error?: string } }
+    subscribe: (listener: () => void) => () => void
+  }
+}
+
+export interface AIToolItem {
+  id: string
+  label: string
+  prompt: string
+  icon?: ComponentType<{ className?: string }>
+}
 
 export interface TapNoteInlineAssistant {
   readonly __brand?: 'TapNoteInlineAssistant'
   /** BlockNote 扩展实例(在 editor 创建时注册)。 */
   readonly extension?: ExtensionFactoryInstance
+  readonly context?: TapNoteInlineAssistantContext
   mount?: (editor: BlockNoteEditor) => void
   unmount?: (editor: BlockNoteEditor) => void
 }
@@ -29,6 +53,7 @@ export interface TapNoteEditorProps {
   inlineAssistant?: TapNoteInlineAssistant
   chatAssistant?: TapNoteChatAssistant
   aiBusyState?: TapNoteAIBusyState
+  aiTools?: readonly AIToolItem[]
   shadCNComponents?: Partial<ShadCNComponents>
   dictionary?: Partial<TapNoteDictionary>
 }

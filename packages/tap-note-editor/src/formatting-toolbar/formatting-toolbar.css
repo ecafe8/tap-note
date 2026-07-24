@@ -1,0 +1,134 @@
+.tn-formatting-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: fit-content;
+  max-width: calc(100vw - 16px);
+}
+
+.tn-formatting-toolbar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.tn-ai-panel-row {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+  min-width: 0;
+}
+
+.tn-ai-panel {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px -4px -4px;
+  padding: 8px;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+
+.tn-ai-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.tn-ai-tool-item,
+.tn-ai-input-row button,
+.tn-ai-status button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tn-ai-tool-item {
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.tn-ai-tool-item:hover,
+.tn-ai-input-row button:hover:not(:disabled),
+.tn-ai-status button:hover:not(:disabled) {
+  background: var(--accent, #f3f4f6);
+}
+
+.tn-ai-tool-item:focus-visible,
+.tn-ai-input-row button:focus-visible,
+.tn-ai-status button:focus-visible,
+.tn-ai-input:focus-visible {
+  outline: 2px solid var(--ring, #3b82f6);
+  outline-offset: 1px;
+}
+
+.tn-ai-tool-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.tn-ai-input-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.tn-ai-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.tn-ai-input-row button,
+.tn-ai-status button {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+}
+
+.tn-ai-input-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.tn-ai-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tn-ai-status-text,
+.tn-ai-error-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tn-ai-error-text {
+  color: var(--destructive, #dc2626);
+}

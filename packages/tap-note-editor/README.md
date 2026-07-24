@@ -30,6 +30,7 @@ export function App() {
 | `inlineAssistant` | `TapNoteInlineAssistant`                | -           | 来自 FEAT-003,可选                         |
 | `chatAssistant`   | `TapNoteChatAssistant`                   | -           | 来自 FEAT-004,可选                         |
 | `aiBusyState`     | `TapNoteAIBusyState`                    | -           | 来自 FEAT-002,会话级 AI 互斥状态          |
+| `aiTools`         | `readonly AIToolItem[]`                  | 内置列表    | AI 技能列表;未传用默认,空数组隐藏技能行  |
 | `shadCNComponents` | `Partial<ShadCNComponents>`              | -           | 局部覆盖 shadcn 组件基线(须通过验证)     |
 | `dictionary`      | `Partial<TapNoteDictionary>`             | zh-CN       | 局部覆盖默认中文文案                       |
 
@@ -141,6 +142,31 @@ import { tapNoteDictionaryZhCN } from "@tap-note/editor";
 ## 助手挂载与 busy 状态
 
 编辑器只保存助手引用并转交 mount/unmount 生命周期,busy 状态由 `aiBusyState` 驱动(来自 FEAT-002 `createAIBusyState`),AI 进行中时编辑器入口禁用并显示 `aiBusy` 文案。未注入助手时不显示 AI 入口。
+
+## AI 工具栏(内联 AI)
+
+当 `inlineAssistant` 包含 `context` 字段时,格式工具栏末尾自动出现 AI 按钮(Lucide 图标)。点击后工具栏保持格式行,向下展开 AI 面板:
+
+- **技能行**:内置扩写/总结/润色/精简,点击即提交对应 prompt
+- **输入行**:自定义指令,Enter 提交,Escape 关闭
+- **状态 UI**:写作中(中止)、审阅(接受/拒绝)、错误(重试)
+
+```tsx
+import { TapNoteEditor } from "@tap-note/editor";
+import type { AIToolItem } from "@tap-note/editor";
+
+const customTools: AIToolItem[] = [
+  { id: "translate", label: "翻译", prompt: "请将选中内容翻译为英文" },
+];
+
+<TapNoteEditor
+  inlineAssistant={inlineAssistant}
+  aiBusyState={aiBusyState}
+  aiTools={customTools}  // 替换默认列表;传 [] 隐藏技能行仅保留输入框
+/>;
+```
+
+> 当前仅提供 zh-CN 字典,英文字典后续 change 补充。
 
 ## 授权边界
 
