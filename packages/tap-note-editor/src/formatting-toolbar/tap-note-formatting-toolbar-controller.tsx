@@ -47,10 +47,12 @@ export function TapNoteFormattingToolbarController({
   portalElement,
 }: TapNoteFormattingToolbarControllerProps) {
   const [aiMode, setAiMode] = useState(false)
+  const [aiPosition, setAiPosition] = useState<{ from: number; to: number }>()
 
   const editor = useBlockNoteEditor<BlockSchema, InlineContentSchema, StyleSchema>()
   const formattingToolbar = useExtension(FormattingToolbarExtension, { editor })
-  const show = useExtensionState(FormattingToolbarExtension, { editor })
+  const extensionShow = useExtensionState(FormattingToolbarExtension, { editor })
+  const show = aiMode || extensionShow
 
   const position = useEditorState({
     editor,
@@ -72,8 +74,16 @@ export function TapNoteFormattingToolbarController({
   })
 
   const handleAiModeChange = useCallback((mode: boolean) => {
+    if (mode && position) {
+      setAiPosition(position)
+    }
+    if (!mode) {
+      setAiPosition(undefined)
+    }
     setAiMode(mode)
-  }, [])
+  }, [position])
+
+  const effectivePosition = aiMode ? aiPosition ?? position : position
 
   const floatingUIOptions = useMemo<FloatingUIOptions>(
     () => ({
@@ -85,6 +95,7 @@ export function TapNoteFormattingToolbarController({
           }
           if (!open && aiMode && reason === 'escape-key') {
             setAiMode(false)
+            setAiPosition(undefined)
           }
           formattingToolbar.store.setState(open)
           if (reason === 'escape-key') {
@@ -108,7 +119,7 @@ export function TapNoteFormattingToolbarController({
   )
 
   return (
-    <PositionPopover position={position} portalElement={portalElement} {...floatingUIOptions}>
+    <PositionPopover position={effectivePosition} portalElement={portalElement} {...floatingUIOptions}>
       {show && (
         <TapNoteFormattingToolbar
           context={context}
@@ -117,9 +128,10 @@ export function TapNoteFormattingToolbarController({
           aiTools={aiTools}
           aiMode={aiMode}
           onAiModeChange={handleAiModeChange}
-          onClose={() => {
-            setAiMode(false)
-            formattingToolbar.store.setState(false)
+            onClose={() => {
+              setAiMode(false)
+              setAiPosition(undefined)
+              formattingToolbar.store.setState(false)
             editor.focus()
           }}
         />

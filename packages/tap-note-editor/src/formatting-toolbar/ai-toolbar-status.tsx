@@ -14,15 +14,15 @@ export function AIToolbarStatus({ status, error, dictionary, context, onClose }:
   if (status === 'thinking' || status === 'ai-writing') {
     return (
       <div className="tn-ai-status" data-test="ai-toolbar-status">
-        <span className="tn-ai-status-text">{dictionary.aiToolbarWriting}</span>
+        <span className="tn-ai-status-text text-sm">{dictionary.aiToolbarWriting}</span>
         <button
           type="button"
           className="tn-ai-abort-btn"
           onClick={() => context.abort()}
           aria-label={dictionary.aiToolbarAbort}
         >
-          <Square size={14} />
-          <span>{dictionary.aiToolbarAbort}</span>
+          <Square size={12} />
+          <span className="text-sm">{dictionary.aiToolbarAbort}</span>
         </button>
       </div>
     )
@@ -40,8 +40,8 @@ export function AIToolbarStatus({ status, error, dictionary, context, onClose }:
           }}
           aria-label={dictionary.aiToolbarAccept}
         >
-          <Check size={14} />
-          <span>{dictionary.aiToolbarAccept}</span>
+          <Check size={12} />
+          <span className="text-sm">{dictionary.aiToolbarAccept}</span>
         </button>
         <button
           type="button"
@@ -52,8 +52,8 @@ export function AIToolbarStatus({ status, error, dictionary, context, onClose }:
           }}
           aria-label={dictionary.aiToolbarReject}
         >
-          <X size={14} />
-          <span>{dictionary.aiToolbarReject}</span>
+          <X size={12} />
+          <span className="text-sm">{dictionary.aiToolbarReject}</span>
         </button>
       </div>
     )
@@ -62,15 +62,15 @@ export function AIToolbarStatus({ status, error, dictionary, context, onClose }:
   if (status === 'error') {
     return (
       <div className="tn-ai-status" data-test="ai-toolbar-status">
-        <span className="tn-ai-error-text">{error}</span>
+        <span className="tn-ai-error-text text-sm">{error}</span>
         <button
           type="button"
           className="tn-ai-retry-btn"
           onClick={() => context.retry()}
           aria-label={dictionary.aiToolbarRetry}
         >
-          <RotateCcw size={14} />
-          <span>{dictionary.aiToolbarRetry}</span>
+          <RotateCcw size={12} />
+          <span className="text-sm">{dictionary.aiToolbarRetry}</span>
         </button>
         <button
           type="button"
@@ -78,7 +78,7 @@ export function AIToolbarStatus({ status, error, dictionary, context, onClose }:
           onClick={onClose}
           aria-label={dictionary.aiToolbarClose}
         >
-          <X size={14} />
+          <X size={12} />
         </button>
       </div>
     )
