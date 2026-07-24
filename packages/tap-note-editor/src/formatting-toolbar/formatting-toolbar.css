@@ -15,6 +15,12 @@
   max-width: 100%;
 }
 
+.tn-formatting-toolbar-controls .bn-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .tn-ai-panel-row {
   display: flex;
   justify-content: flex-start;
@@ -118,11 +124,18 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
   min-width: 0;
 }
 
-.tn-ai-status-text,
+.tn-ai-status-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+
 .tn-ai-error-text {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
